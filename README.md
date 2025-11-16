@@ -211,9 +211,9 @@ with open("input.jsonl", "r") as fin, open("output.jsonl", "w") as fout:
 | Dolphin | 0.356 | 0.352 | 0.465 | 0.258 | 0.44 | 0.44 | 0.604 | 0.367 |
 | SmolDocling | 0.493 | 0.262 | 0.753 | 0.729 | 0.816 | 0.838 | 0.997 | 0.907 |
 | dots.ocr-3B | 0.182 | 0.137 | 0.320 | 0.166 | 0.261 | 0.229 | 0.468 | 0.160 |
-| DeepseekOCR | **0.123** | 0.049 | **0.242** | 0.147 | **0.157** | 0.087 | **0.377** | **0.08** |
+| HunyuanOCR | **0.123** | 0.049 | **0.242** | 0.147 | **0.157** | 0.087 | **0.377** | **0.08** |
 
-> **Summary**: DeepseekOCR demonstrates superior performance in both English and Chinese document parsing, achieving the lowest edit distances across most categories.
+> **Summary**: HunyuanOCR demonstrates superior performance in both English and Chinese document parsing, achieving the lowest edit distances across most categories.
 
 ### Information Extraction (in-house Benchmark) and VQA Performance (OCRBench)
 
@@ -232,13 +232,15 @@ with open("input.jsonl", "r") as fin, open("output.jsonl", "w") as fout:
 ## 💡 Case Studies
 <details>
 
+Spotting
+
 Document Processing
 
 
-Table Recognition
+Information Extraction
 
 
-Mixed Language Processing
+Translation
 
 
 </details>
