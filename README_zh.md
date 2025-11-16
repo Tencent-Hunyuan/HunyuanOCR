@@ -105,7 +105,7 @@ def load_model():
     return model, processor
 ```
 
-## 3. 推理代码
+#### 3. 推理代码
 ```python
 def inference(text: str, img_path: str, model, processor) -> list:
     # Construct input format
@@ -147,7 +147,7 @@ def inference(text: str, img_path: str, model, processor) -> list:
     )
 ```
 
-## 4. 使用示例
+#### 4. 使用示例
 ```python
 # Load model
 model, processor = load_model()
