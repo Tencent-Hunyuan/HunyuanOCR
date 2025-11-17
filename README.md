@@ -154,12 +154,24 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 | DeepSeek-OCR | 25.29 | 5.41 | 430 |
 | PP-ChatOCR | 53.64 | 3.1 | - |
 | Qwen3VL-2B-Instruct | 66.12 | 3.75 | 858 |
-| Seed1.5-VL | 68.81 | 60.45 | 881 |
+| Seed1.6-VL | 68.81 | 60.45 | 881 |
 | Qwen3VL-235B-A22B-Instruct | 77.0 | 50.74 | **920** |
 | Gemini-2.5-Pro | 80.63 | 53.65 | 872 |
-| **HunyuanOCR (∼1B)** | **92.41** | **92.87** | 858 |
+| **HunyuanOCR (∼1B)** | **92.41** | **92.87** | 860 |
 
 > **Summary**: HunyuanOCR significantly outperforms larger models in cards/receipts processing and video subtitle extraction, while maintaining competitive performance on OCRBench.
+
+### Text Image Transation (in-house Benchmark) Performance
+
+| Method | Size | Other2En | Other2Zh | DoTA (en2zh) |
+|--------|------|-----------|-----------|--------------|
+| Gemini-2.5-Flash | - | 79.26 | 80.06 | - |
+| Qwen3-VL-235B | 235B | 73.67 | 77.20 | - |
+| Qwen3-VL-4B | 4B | 70.38 | 70.29 | - |
+| Qwen3-VL-2B | 2B | 66.30 | 66.77 | - |
+| **HunyuanOCR** | **1B** | 73.38 | 73.62 | - |
+
+> **总结**: HunyuanOCR using only 1B of parameters, achieved comparable results to Gemini-2.5-Flash and Qwen3-VL-235B in photo translation tasks.
 
 ## 💡 Visualizations
 <details>

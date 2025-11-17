@@ -117,7 +117,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 ## 📊 评测指标
 
-### 自建评测集上的文字检测识别效果
+### 自建评测集上的文字检测识别指标
 
 | Model Type | Methods | Overall | Art | Doc | Game | Hand | Ads | Receipt | Screen | Scene | Video |
 |------------|---------|---------|-----|-----|------|------|-----|----------|---------|--------|--------|
@@ -130,7 +130,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 > **总结**: HunyuanOCR OCR在各种场景下均取得了最佳的整体性能（70.92%），显著优于传统的OCR方法和常见的VLM。
 
-### OmniDocBench 上的文档解析效果 (使用编辑距离评测)
+### OmniDocBench 上的文档解析指标 (使用编辑距离评测)
 
 | Model | English |  |  |  | Chinese |  |  |  |
 |-------|---------|---------|----------|--------|----------|---------|----------|---------|
@@ -142,20 +142,31 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 > **总结**: HunyuanOCR 在英语和中文文档解析方面均表现出优异的性能，在大多数类别中实现了最低的编辑距离。
 
-### 信息抽取 (自建评测集) 和 OCRbench的效果
+### 信息抽取 (自建评测集) 和 OCRbench的指标
 
 | Model | Cards & Receipts | Video Subtitles | OCRBench |
 |-------|------------------|-----------------|-----------|
 | DeepSeek-OCR | 25.29 | 5.41 | 430 |
 | PP-ChatOCR | 53.64 | 3.1 | - |
 | Qwen3VL-2B-Instruct | 66.12 | 3.75 | 858 |
-| Seed1.5-VL | 68.81 | 60.45 | 881 |
+| Seed1.6-VL | 68.81 | 60.45 | 881 |
 | Qwen3VL-235B-A22B-Instruct | 77.0 | 50.74 | **920** |
 | Gemini-2.5-Pro | 80.63 | 53.65 | 872 |
-| **HunyuanOCR (∼1B)** | **92.41** | **92.87** | 858 |
+| **HunyuanOCR (∼1B)** | **92.41** | **92.87** | 860 |
 
 > **总结**: HunyuanOCR 在卡证票据信息抽取和视频字幕提取任务上，性能均显著优于常见的VLM模型，同时在OCRBench上也达到了同样量级模型的SOTA效果。
 
+### 自建评测集上的拍照翻译指标
+
+| Method | Size | Other2En | Other2Zh | DoTA (en2zh) |
+|--------|------|-----------|-----------|--------------|
+| Gemini-2.5-Flash | - | 79.26 | 80.06 | - |
+| Qwen3-VL-235B | 235B | 73.67 | 77.20 | - |
+| Qwen3-VL-4B | 4B | 70.38 | 70.29 | - |
+| Qwen3-VL-2B | 2B | 66.30 | 66.77 | - |
+| **HunyuanOCR** | **1B** | 73.38 | 73.62 | - |
+
+> **总结**: HunyuanOCR仅使用1B参数量，在拍照翻译任务上取得了与Gemini-2.5-Flash以及Qwen3-VL-235B相当的效果。
 
 ## 💡 效果可视化
 <details>
@@ -182,6 +193,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 **Prompt:**
 提取图片中的：['单价', '上车时间', '发票号码', '省前缀', '总金额', '发票代码', '下车时间', '里程数']的字段内容，并且按照JSON格式返回。
+
 **Response:**
 ```json
 {
