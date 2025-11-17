@@ -163,14 +163,14 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 ## 💡 Visualizations
 <details>
-<summary>Click to view detailed results.</summary>
+<summary>Click here to view detailed results.</summary>
 
 ### Spotting
 
 
 <p align="left">
- <img src="./assets/spotting1_cropped.png" width="30%"/> <br>
- <img src="./assets/vis_document_23.jpg" width="30%"/> <br>
+ <img src="./assets/spotting1_cropped.png" width="20%"/> <br>
+ <img src="./assets/vis_document_23.jpg" width="20%"/> <br>
 </p>
 
 
@@ -181,11 +181,12 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 <p align="left">
- <img src="./assets/ie_parallel.jpg" width="10%"/> <br>
+ <img src="./assets/ie_parallel.jpg" width="5%"/> <br>
 </p>
 
 **Prompt:**
 Extract the content of the fields: ['单价', '上车时间', '发票号码', '省前缀', '总金额', '发票代码', '下车时间', '里程数'] from the image and return it in JSON format.
+
 **Response:**
 ```json
 {
@@ -206,6 +207,7 @@ Extract the content of the fields: ['单价', '上车时间', '发票号码', '�
 
 **Prompt:**
 Extract the subtitles from the image.
+
 **Response:**
 对不起 我是诺曼·斯佩尔曼\nSorry, I'm Norm. Spellman.
 

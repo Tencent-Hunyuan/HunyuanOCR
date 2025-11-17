@@ -165,8 +165,8 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 <p align="left">
- <img src="./assets/spotting1_cropped.png" width="30%"/> <br>
- <img src="./assets/vis_document_23.jpg" width="30%"/> <br>
+ <img src="./assets/spotting1_cropped.png" width="20%"/> <br>
+ <img src="./assets/vis_document_23.jpg" width="20%"/> <br>
 </p>
 
 
@@ -177,7 +177,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 <p align="left">
- <img src="./assets/ie_parallel.jpg" width="10%"/> <br>
+ <img src="./assets/ie_parallel.jpg" width="5%"/> <br>
 </p>
 
 **Prompt:**
