@@ -6,8 +6,8 @@
 
 # HunyuanOCR
 
-<p align="center">
- <img src="./assets/hyocr-head-img.png" width="500"/> <br>
+<p align="left">
+ <img src="./assets/hyocr-head-img.png" width="800"/> <br>
 </p>
 
 <div align="center">
@@ -229,7 +229,9 @@ Extract the subtitles from the image.
 
 
 ### Translation
-
+<p align="left">
+ <img src="./assets/vis-translation.png" width="20%"/> <br>
+</p>
 
 </details>
 

@@ -6,8 +6,8 @@
 
 # 混元OCR：原生多模态端到端 OCR 专家，1B 轻量化参数却斩获多项业界 SOTA！
 
-<p align="center">
- <img src="./assets/hunyuan_logo.png" width="400"/> <br>
+<p align="left">
+ <img src="./assets/hyocr-head-img.png" width="800"/> <br>
 </p>
 
 <div align="center">
@@ -182,7 +182,9 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 ### 文档解析
-
+<p align="left">
+ <img src="./assets/vis-parsing.png" width="20%"/> <br>
+</p>
 
 ### 信息抽取
 
@@ -221,6 +223,9 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 ### 翻译
+<p align="left">
+ <img src="./assets/vis-translation.png" width="20%"/> <br>
+</p>
 
 </details>
 
