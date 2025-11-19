@@ -222,6 +222,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 <summary><u style="color: #2E64FE;">点击展开详情</u></summary>
 
 ### 文字检测识别
+#### 旨在对文字图像中出现的所有文字，按照行级别粒度进行文本内容和对应的坐标信息输出。我们模型对文档、艺术字、街景、手写、广告、票据、截屏、游戏、视频等场景上表现卓越。
 
 
 <p align="left">
