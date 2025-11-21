@@ -290,7 +290,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 <p align="left">
  <img src="./assets/vis_subtitle1.png" width="30%"/> <br>
  <img src="./assets/vis_subtitle2.png" width="30%"/> <br>
- <img src="./assets/vis_subtitle3.png" width="27%"/> <br>
+ <img src="./assets/vis_subtitle3.png" width="28%"/> <br>
 </p>
 
 

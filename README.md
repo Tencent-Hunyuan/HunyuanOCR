@@ -300,7 +300,7 @@ Our model is capable of automatically extracting subtitles from videos, includin
 <p align="left">
  <img src="./assets/vis_subtitle1.png" width="30%"/> <br>
  <img src="./assets/vis_subtitle2.png" width="30%"/> <br>
- <img src="./assets/vis_subtitle3.png" width="27%"/> <br>
+ <img src="./assets/vis_subtitle3.png" width="28%"/> <br>
 </p>
 
 
