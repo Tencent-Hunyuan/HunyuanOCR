@@ -246,9 +246,75 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 #### Digitizing scanned or photographed images of multilingual documents involves, specifically, organizing the text content within the images according to reading order, using LaTeX format for formulas, and expressing complex tables in HTML format.
 
 <p align="left">
- <img src="./assets/vis-parsing.png" width="30%"/> <br>
+ <img src="./assets/vis_parsing_fig.png" width="30%"/> <br>
 </p>
+**Prompt:**
+提取文档图片中正文的所有信息用markdown格式表示，其中页眉、页脚部分忽略，表格用html格式表达，文档中公式用latex格式表示，按照阅读顺序组织进行解析。
 
+**Response:**
+第二步:结合菱形的性质和图②中的已知条件进行求解. \\
+
+        \textless pFig\textgreater 第10题解图\textless /pFig\textgreater \textless quad\textgreater (204,50),(325,111)\textless /quad\textgreater \\
+
+        \#\# 二、填空题(每小题3分,共15分)
+
+        11.$ x\geq - 1 $且$ x\ne 0 $
+
+        12.0【解析】由题意得,反比例函数$ y=\frac{1+2m}{x} $的图象位于第一、三象限,$ \therefore 1+2m\textgreater 0,\therefore m\textgreater -\frac{1}{2},\therefore m $ 的最小整数值为0.
+
+        13.$ \frac{2}{9} $ 【解析】根据题意,画树状图如解图,\\
+
+        \textless pFig\textgreater 第13题解图\textless /pFig\textgreater \textless quad\textgreater (145,291),(388,357)\textless /quad\textgreater \\
+
+        由树状图知,共有9种等可能的结果,其中可以呈现青色的结果有2种,$ \therefore P(\text{可以呈现青色})=\frac{2}{9} $.
+
+        14.$ 2\sqrt{10}+\frac{\sqrt{10}}{2}\pi $ 【解析】如解图,连接OB,AC,由题意可知 $OA=OB=OC=\sqrt{3^{2}+1^{2}}=\sqrt{10},AC=\sqrt{2^{2}+4^{2}}=2\sqrt{5}$,
+        $\therefore OA^{2}+OC^{2}=AC^{2}$,
+        $\therefore\angle AOC=90^{\circ}$,
+        $\therefore$ 圆心角AOC所对的弧长为 $\frac{90\times\pi\times\sqrt{10}}{180}=\frac{\sqrt{10}}{2}\pi$,
+        $\therefore$扇形AOC的周长为$ 2\sqrt{10}+\frac{\sqrt{10}}{2}\pi $.\\
+
+        \textless pFig\textgreater 第14题解图\textless /pFig\textgreater \textless quad\textgreater (362,436),(461,510)\textless /quad\textgreater \\
+
+        知识精准回顾：$ n^{\circ} $的圆心角所对的弧长计算公式为 $l=\frac{n\pi r}{180} $.
+
+        15.$ \frac{4\sqrt{3}}{3} $或$ \frac{8\sqrt{3}}{3}$ 【解析】当$\angle BDB^{\prime}=120^{\circ}$时,
+        分两种情况：①当点B'在BC的下方时,如解图①,设AB'与BC的交点为O,$ \because\angle BAC = 120^{\circ},AB = AC,\therefore\angle B=\angle C=30^{\circ} $.
+        由折叠的性质可知$ \angle B^{\prime}=\angle B=30^{\circ},\because\angle BDB^{\prime}=120^{\circ},\therefore\angle B^{\prime}DO=60^{\circ},\therefore\angle DOB^{\prime}=90^{\circ},\therefore DO=\frac{1}{2}B^{\prime}D=\frac{1}{2}BD,\therefore BO=BD+DO=BD+\frac{1}{2}BD=\frac{3}{2}BD.\because $
+        在$ Rt\triangle ABO $中,$ BO=AB\cdot\cos30^{\circ}=2\sqrt{3},\therefore\frac{3}{2}BD=2\sqrt{3},\therefore BD=\frac{4\sqrt{3}}{3} $；
+        ②当点B'在BC的上方时,如解图②,由折叠得$ \angle ADB^{\prime}=\angle ADB=\frac{1}{2}\angle BDB^{\prime} = 60^{\circ},\because\angle B=30^{\circ},\therefore\angle BAD=90^{\circ},\because AB = 4,\therefore BD=\frac{AB}{\cos30^{\circ}}=\frac{4}{\frac{\sqrt{3}}{2}}=\frac{8\sqrt{3}}{3} $.
+
+                    综上所述,BD的长为$ \frac{4\sqrt{3}}{3} $或$ \frac{8\sqrt{3}}{3} $. \\
+
+                    \textless pFig\textgreater 第15题解图\textless /pFig\textgreater \textless quad\textgreater (516,188),(809,266)\textless /quad\textgreater \\
+
+                    \textless pFig\textgreater 视频讲解\textbackslash n白卷·15题\textless /pFig\textgreater \textless quad\textgreater (639,289),(713,350)\textless /quad\textgreater\\
+
+                $ \underline{\text{更多新考法实体 见《重难题新考法》P25重难题二}} $
+
+                $ \underline{\text{多解题}} $
+
+                    \#\# 三、解答题（本大题共8个小题,共75分）
+
+                    16.解：(1) 原式=1+4+2·····3分
+                    =7;·····5分
+
+                    (2) 原式=$ 4x^{2}-4-(4x^{2}-4x+1) $
+                $ =4x^{2}-4-4x^{2}+4x-1 $·····3分
+                $ =4x-5 $.·····5分
+
+                    17.解：(1)40,78.5;·····4分
+
+                    【解法提示】 $ \because $对A款AI机器人评分抽取的样本容量为6+6+4+4=20,$ \therefore $本次抽取的问卷共有20+20=40(份).$ \because $对A款AI机器人评分的中位数为第10和11个数据的平均数,$ \therefore $将$ 70\leq x \textless  80 $这一组的评分按从小到大的顺序排列为:74,75,78,78,79,79,$ \therefore $第10和11个数据分别为78,79,$ \therefore $中位数为$ \frac{1}{2}\times(78 + 79)=78.5 $分.
+
+                    (2) 由(1)得对A款AI机器人评分的中位数为78.5分,
+                $ \because $78.5分\textless  80分,
+                $ \therefore $对A款AI机器人感到满意的人数未超过一半;·····6分
+
+                    (3) 由条形统计图得,对B款AI机器人评分为非常满意的有2人,
+                $ \therefore300\times\frac{2}{20}=30 $ (人) ,
+
+                答：估计此次问卷调查活动中对B款AI机器人非
 
 ### Open-field Information Extraction
 #### For common cards and tickets, fields of interest (such as name/address/company) are parsed using standard JSON format.
