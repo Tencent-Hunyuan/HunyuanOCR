@@ -11,7 +11,7 @@
 </div>
 
 <p align="center">
- <img src="./assets/hyocr-head-img.png" width="60%"/> <br>
+ <img src="./assets/hyocr-head-img.png" width="80%"/> <br>
 </p>
 
 
@@ -42,7 +42,7 @@ Built on Tencent's Hunyuan technology, this versatile model delivers exceptional
 - 🌏 **Extensive Language Support**: Robust support for over 100 languages, excelling in both single-language and mixed-language scenarios across various document types.
 
 <div align="left">
-  <img src="./assets/hyocr-pipeline.png" alt="HunyuanOCR framework" width="50%">
+  <img src="./assets/hyocr-pipeline.png" alt="HunyuanOCR framework" width="80%">
 </div>
 
 
@@ -222,8 +222,8 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 Our model aims to output the text content and corresponding coordinate information of all text appearing in a text image at the line level. It performs exceptionally well in scenarios such as documents, artistic fonts, street views, handwriting, advertisements, invoices, screenshots, games, and videos.
 
 <p align="left">
- <img src="./assets/spotting1_cropped.png" width="30%"/> <br>
- <img src="./assets/vis_document_23.jpg" width="30%"/> <br>
+ <img src="./assets/spotting1_cropped.png" width="40%"/> <br>
+ <img src="./assets/vis_document_23.jpg" width="40%"/> <br>
 </p>
 
 
@@ -232,18 +232,18 @@ Our model aims to output the text content and corresponding coordinate informati
 Digitizing scanned or photographed images of multilingual documents involves, specifically, organizing the text content within the images according to reading order, using LaTeX format for formulas, and expressing complex tables in HTML format.
 
 <p align="left">
- <img src="./assets/vis_parsing_fig.png" width="30%"/> <br>
-  <img src="./assets/show_res_parsing_fig.png" width="30%"/> <br>
-  <img src="./assets/vis_parsing_table.png" width="30%"/> <br>
-  <img src="./assets/vis_parsing_table_2.png" width="30%"/> <br>
-  <img src="./assets/parsing_rgsj.png" width="30%"/> <br>
-  <img src="./assets/parsing_rgsjz_2.png" width="30%"/> <br>
-  <img src="./assets/qikai1.png" width="30%"/> <br>
-  <img src="./assets/guwan1.png" width="30%"/> <br>
-  <img src="./assets/parsing_chart1.png" width="30%"/> <br>
-  <img src="./assets/vis_parsing_chart1.png" width="30%"/> <br>
-  <img src="./assets/vis_parsing_chart2.png" width="30%"/> <br>
-  <img src="./assets/vis_parsing_chart3.png" width="30%"/> <br>
+ <img src="./assets/vis_parsing_fig.png" width="40%"/> <br>
+  <img src="./assets/show_res_parsing_fig.png" width="40%"/> <br>
+  <img src="./assets/vis_parsing_table.png" width="40%"/> <br>
+  <img src="./assets/vis_parsing_table_2.png" width="40%"/> <br>
+  <img src="./assets/parsing_rgsj.png" width="40%"/> <br>
+  <img src="./assets/parsing_rgsjz_2.png" width="40%"/> <br>
+  <img src="./assets/qikai1.png" width="40%"/> <br>
+  <img src="./assets/guwan1.png" width="40%"/> <br>
+  <img src="./assets/parsing_chart1.png" width="40%"/> <br>
+  <img src="./assets/vis_parsing_chart1.png" width="40%"/> <br>
+  <img src="./assets/vis_parsing_chart2.png" width="40%"/> <br>
+  <img src="./assets/vis_parsing_chart3.png" width="40%"/> <br>
 </p>
 
 
@@ -253,11 +253,11 @@ Digitizing scanned or photographed images of multilingual documents involves, sp
 For common cards and tickets, fields of interest (such as name/address/company) are parsed using standard JSON format.
 
 <p align="left">
- <img src="./assets/vis_ie_1.png" width="30%"/> <br>
+ <img src="./assets/vis_ie_1.png" width="40%"/> <br>
 </p>
 
 <p align="left">
- <img src="./assets/ie_parallel.jpg" width="10%"/> <br>
+ <img src="./assets/ie_parallel.jpg" width="25%"/> <br>
 </p>
 
 **Prompt:**
@@ -282,9 +282,9 @@ Extract the content of the fields: ['单价', '上车时间', '发票号码', '�
 Our model is capable of automatically extracting subtitles from videos, including bilingual ones.
 
 <p align="left">
- <img src="./assets/vis_subtitle1.png" width="30%"/> <br>
- <img src="./assets/vis_subtitle2.png" width="30%"/> <br>
- <img src="./assets/vis_subtitle3.png" width="27.5%"/> <br>
+ <img src="./assets/vis_subtitle1.png" width="40%"/> <br>
+ <img src="./assets/vis_subtitle2.png" width="40%"/> <br>
+ <img src="./assets/vis_subtitle3.png" width="37.5%"/> <br>
 </p>
 
 
@@ -294,7 +294,7 @@ Our model is capable of automatically extracting subtitles from videos, includin
 Our model is able to translate images of minor languages ​​taken into Chinese or English text format end-to-end. Currently, it mainly supports 14 frequently used minor languages ​​(specifically including: German, Spanish, Turkish, Italian, Russian, French, Portuguese, Arabic, Thai, Vietnamese, Indonesian, Malay, Japanese, and Korean) into Chinese/English, as well as Chinese-English translation function (it won the small model track championship in the ICDAR2025 document end-to-end translation competition).
 
 <p align="left">
- <img src="./assets/translation2.png" width="30%"/> <br>
+ <img src="./assets/translation2.png" width="40%"/> <br>
 </p>
 
 </details>
@@ -314,4 +314,3 @@ Our model is able to translate images of minor languages ​​taken into Chines
 Thanks to all contributors who helped build HunyuanOCR
 Special thanks to the Tencent Hunyuan Team
 We appreciate the support from the open-source community
->>>>>>> dev_ethann
