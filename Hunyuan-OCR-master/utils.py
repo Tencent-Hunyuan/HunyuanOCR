@@ -142,9 +142,9 @@ def draw_text_detection_boxes(image: Image, response: str) -> Image:
 def main():
     """Main function to process images and visualize results"""
     # Read JSONL file
-    jsonl_path = "/apdcephfs_gy2/share_303242896/ethannwan/0.5b_ptm/data/OCRSpotting1_vllm_infer_1117.jsonl"
+    jsonl_path = "/path/to/test_data.jsonl"
     output_dir = "output_visualizations"
-    image_root = "/apdcephfs_cq8/share_1367250/aleclv/data/ocr_data/benchmarks/OCRSpotting1/image_test"
+    image_root = "/path/to/image_root"
     
     os.makedirs(output_dir, exist_ok=True)
     
@@ -159,7 +159,7 @@ def main():
     
     # Get image path and response
     image_path = os.path.join(image_root, item["image_name"])
-    response = clean_repeated_substrings(item["vllm-infer-1117"])
+    response = clean_repeated_substrings(item["vllm-infer"])
     
     print(f"Processing image: {item['image_name']}")
     

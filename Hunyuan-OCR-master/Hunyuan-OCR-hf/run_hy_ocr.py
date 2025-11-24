@@ -46,11 +46,7 @@ def main():
             "content": [
                 {"type": "image", "image": img_path},
                 {"type": "text", "text": (
-                    "Extract all information from the main body of the document image "
-                    "and represent it in markdown format, ignoring headers and footers. "
-                    "Tables should be expressed in HTML format, formulas in the document "
-                    "should be represented using LaTeX format, and the parsing should be "
-                    "organized according to the reading order."
+                    "检测并识别图片中的文字，将文本坐标格式化输出。"
                 )},
             ],
         }

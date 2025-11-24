@@ -79,7 +79,7 @@ img = Image.open(img_path)
 messages = [
     {"role": "user", "content": [
         {"type": "image", "image": img_path},
-        {"type": "text", "text": "Detect and recognize text in the image, and output the text coordinates in a formatted manner."}
+        {"type": "text", "text": "检测并识别图片中的文字，将文本坐标格式化输出。"}
     ]}
 ]
 prompt = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
@@ -114,11 +114,7 @@ messages1 = [
         "content": [
             {"type": "image", "image": img_path},
             {"type": "text", "text": (
-                "Extract all information from the main body of the document image "
-                "and represent it in markdown format, ignoring headers and footers. "
-                "Tables should be expressed in HTML format, formulas in the document "
-                "should be represented using LaTeX format, and the parsing should be "
-                "organized according to the reading order."
+                "提取文档图片中正文的所有信息用markdown格式表示，其中页眉、页脚部分忽略，表格用html格式表达，文档中公式用latex格式表示，按照阅读顺序组织进行解析。"
             )},
         ],
     }
