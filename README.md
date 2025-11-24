@@ -15,13 +15,15 @@
 </p>
 
 
-<div align="center">
+<p align="center">
 
+<a href="http://29.210.129.176:8080/"><b>🎯 Demo</b></a> |
 
+<a href="https://huggingface.co/tencent/HunyuanOCR"><b>📥 Model Download</b></a> |
 
-[Demo](http://29.210.129.176:8080/) | [Install](#installation) | [Quick Start](#quick-start) | [Prompt Templates](#prompts)  | [Technical Report](./HunyuanOCR_Technical_Report.pdf)
+<a href="./Hunyuan_OCR_Technical_Report.pdf"><b>📄 Technical Report</b></a>
 
-</div>
+</p>
 
 ## 🔥 News
 - **[2025/11/25]** 📝 Inference code and model weights publicly available.
@@ -48,7 +50,7 @@ Built on Tencent's Hunyuan technology, this versatile model delivers exceptional
 
 
 
-## 🛠️ Dependencies and Installation {#installation}
+## 🛠️ Dependencies and Installation
 
 ### System Requirements
 - 🖥️ Operating System: Linux
@@ -68,7 +70,7 @@ pip install torch==2.7.1 torchvision==0.22.1 torchaudio==2.7.1 --index-url https
 
 
 
-## 🚀 Quick Start with Transformers {#quick-start}
+## 🚀 Quick Start with Transformers
 
 ### Model Inference
 
@@ -137,7 +139,7 @@ print(output_texts)
 cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 ```
 
-## 💬 Application-oriented Prompts {#prompts}
+## 💬 Application-oriented Prompts
 
 | Task | English | Chinese |
 |------|---------|---------|
