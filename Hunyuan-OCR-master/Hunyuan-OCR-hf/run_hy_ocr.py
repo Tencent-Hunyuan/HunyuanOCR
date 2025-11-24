@@ -9,6 +9,25 @@ import base64
 import requests
 from io import BytesIO
 
+def clean_repeated_substrings(text):
+    """Clean repeated substrings in text"""
+    n = len(text)
+    if n<8000:
+        return text
+    for length in range(2, n // 10 + 1):
+        candidate = text[-length:] 
+        count = 0
+        i = n - length
+        
+        while i >= 0 and text[i:i + length] == candidate:
+            count += 1
+            i -= length
+
+        if count >= 10:
+            return text[:n - length * (count - 1)]  
+
+    return text
+
 def get_image(input_source):
     if input_source.startswith(('http://', 'https://')):
         response = requests.get(input_source)
@@ -66,9 +85,9 @@ def main():
     generated_ids_trimmed = [
         out_ids[len(in_ids):] for in_ids, out_ids in zip(input_ids, generated_ids)
     ]
-    output_texts = processor.batch_decode(
+    output_texts = clean_repeated_substrings(processor.batch_decode(
         generated_ids_trimmed, skip_special_tokens=True, clean_up_tokenization_spaces=False
-    )
+    ))
     print(output_texts)
 
 if __name__ == '__main__':

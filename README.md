@@ -19,7 +19,7 @@
 
 
 
-[Demo](http://29.210.129.176:8080/) | [Install](#dependencies-and-installation) | [Quick Start](#quick-start-with-transformers) | [Prompt Templates](#application-oriented-prompts) | [Technical Report](#citation)
+[Demo](http://29.210.129.176:8080/) | [Install](#dependencies-and-installation) | [Quick Start](#quick-start-with-transformers) | [Prompt Templates](#application-oriented-prompts) | [Technical Report](./Hunyuan_OCR_Technical_Report.pdf)
 
 </div>
 

@@ -6,7 +6,7 @@
 
 <div align="center">
 
-# 混元OCR：原生多模态端到端 OCR 专家，1B 轻量化参数却斩获多项业界 SOTA！
+# 混元OCR：混元原生多模态端到端 OCR 专家，1B 轻量化参数却斩获多项业界 SOTA！
 
 </div>
 <p align="center">
@@ -16,7 +16,7 @@
 <div align="center">
 
 
-[演示](http://29.210.129.176:8080/) | [安装](#环境依赖与安装) | [快速开始](#基于transformers快速使用) | [提示词](#推荐的ocr任务提示词) | [技术报告](#引用)
+[演示](http://29.210.129.176:8080/) | [安装](#环境依赖与安装) | [快速开始](#基于transformers快速使用) | [提示词](#推荐的ocr任务提示词) | [技术报告](./Hunyuan_OCR_Technical_Report.pdf)
 </div>
 
 ## 🔥 最新动态
