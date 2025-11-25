@@ -56,7 +56,7 @@
 - 🧠 GPU Memory: 80GB
 - 💾 Disk Space: 6GB
 
-## 🚀 Quick Start with vLLM
+## 🚀 Quick Start with vLLM (⭐ Recommended)
 ### Installation
 ```bash
 pip install vllm --extra-index-url https://wheels.vllm.ai/nightly
