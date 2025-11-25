@@ -58,7 +58,13 @@
 
 ### 安装步骤
 ```bash
-pip install vllm --extra-index-url https://wheels.vllm.ai/nightly
+pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+```
+
+或使用nv：
+
+```bash
+uv pip install vllm --extra-index-url https://wheels.vllm.ai/nightly
 ```
 
 ### 模型推理

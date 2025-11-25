@@ -61,8 +61,15 @@
 - **[HunyuanOCR Usage Guide](https://docs.vllm.ai/projects/recipes/en/latest/Tencent-Hunyuan/HunyuanOCR.html)**
 
 ### Installation
+Using `pip`: 
 ```bash
-pip install vllm --extra-index-url https://wheels.vllm.ai/nightly
+pip install vllm --pre --extra-index-url https://wheels.vllm.ai/nightly
+```
+
+Using `uv`
+
+```bash
+uv pip install vllm --extra-index-url https://wheels.vllm.ai/nightly
 ```
 
 ### Model Inference
