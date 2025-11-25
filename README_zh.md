@@ -160,7 +160,7 @@ model = HunYuanVLForConditionalGeneration.from_pretrained(
 with torch.no_grad():
     device = next(model.parameters()).device
     inputs = inputs.to(device)
-    generated_ids = model.generate(**inputs, max_new_tokens=1024, do_sample=False)
+    generated_ids = model.generate(**inputs, max_new_tokens=16384, do_sample=False)
 if "input_ids" in inputs:
     input_ids = inputs.input_ids
 else:
@@ -342,13 +342,12 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 
 ## 📚 引用
-@misc{hunyuanocr2025,
-    title={HunyuanOCR Technical Report},
-    author={Tencent Hunyuan Vision Team},
-    year={2025},
-    publisher={GitHub},
-    journal={GitHub repository},
-    howpublished={\url{https://github.com/Tencent-Hunyuan/HunyuanOCR}}
+@software{hunyuanocr2025,
+  author    = {Tencent Hunyuan Vision Team},
+  title     = {HunyuanOCR Technical Report},
+  year      = {2025},
+  url       = {https://github.com/Tencent-Hunyuan/HunyuanOCR},
+  publisher = {GitHub}
 }
 
 ## 🙏 致谢
