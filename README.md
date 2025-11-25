@@ -252,7 +252,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 
 > **Summary**: HunyuanOCR significantly outperforms larger models in cards/receipts processing and video subtitle extraction, while maintaining competitive performance on OCRBench.
 
-### Text Image Transation (in-house Benchmark) Performance
+### Text Image Translation (in-house Benchmark) Performance
 
 | Method | Size | Other2En | Other2Zh | DoTA (en2zh) |
 |--------|------|-----------|-----------|--------------|
