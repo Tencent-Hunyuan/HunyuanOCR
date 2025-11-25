@@ -217,7 +217,7 @@ cd Hunyuan-OCR-master/Hunyuan-OCR-hf && python run_hy_ocr.py
 | **General VLMs** | Qwen3-VL-235B | 235B | 89.15 | 0.069 | 88.14 | 86.21 | 79.69 | 0.09 | 80.67 | 68.31 | 81.40 |
 | **Specialized VLMs (Modular)** | MonkeyOCR-pro-3B | 3B | 88.85 | 0.075 | 87.5 | 86.78 | 70.00 | 0.211 | 63.27 | 67.83 | 56.50 |
 | **Specialized VLMs (Modular)** | MinerU2.5 | 1.2B | 90.67 | 0.047 | 88.46 | 88.22 | 70.91 | 0.218 | 64.37 | 70.15 | 52.05 |
-| **Specialized VLMs (Modular)** | PaddleOCR-VL | 0.9B | 91.93 | 0.039 | 88.67 | 91.01 | 72.19 | 0.232 | 65.54 | 74.24 | 57.42 |
+| **Specialized VLMs (Modular)** | PaddleOCR-VL | 0.9B | 92.86 | 0.035 | 91.22 | 90.89 | 72.19 | 0.232 | 65.54 | 74.24 | 57.42 |
 | **Specialized VLMs (End2End)** | Mistral-OCR | - | 78.83 | 0.164 | 82.84 | 70.03 | - | - | - | - | 64.71 |
 | **Specialized VLMs (End2End)** | Deepseek-OCR | 3B | 87.01 | 0.073 | 83.37 | 84.97 | 74.23 | 0.178 | 70.07 | 70.41 | 57.22 |
 | **Specialized VLMs (End2End)** | dots.ocr | 3B | 88.41 | 0.048 | 83.22 | 86.78 | 78.01 | 0.121 | 74.23 | 71.89 | 77.50 |
