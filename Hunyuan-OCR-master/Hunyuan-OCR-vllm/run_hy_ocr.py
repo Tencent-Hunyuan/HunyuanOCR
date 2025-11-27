@@ -3,6 +3,7 @@ import base64
 from openai import OpenAI
 from tqdm import tqdm
 from typing import Dict, List
+import mimetypes
 
 def encode_image(image_path: str) -> str:
     """
@@ -28,6 +29,11 @@ def create_chat_messages(image_path: str, prompt: str) -> List[Dict]:
     Returns:
         List of message dictionaries
     """
+    # Detect MIME type (jpg/png/webp/etc)
+    mime, _ = mimetypes.guess_type(image_path)
+    if mime is None:
+        mime = "image/jpeg"  # fallback
+
     return [
         {"role": "system", "content": ""},
         {
@@ -35,9 +41,7 @@ def create_chat_messages(image_path: str, prompt: str) -> List[Dict]:
             "content": [
                 {
                     "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{encode_image(image_path)}"
-                    }
+                    "image_url": f"data:{mime};base64,{encode_image(image_path)}"
                 },
                 {"type": "text", "text": prompt}
             ]
