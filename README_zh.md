@@ -31,8 +31,8 @@
 </div>
 
 ## 🔥 最新动态
-- **[2025/11/25]** 📝 推理代码和模型权重已开源。
 - **[2025/11/28]** 🛠️ 我们修复了vLLM推理bug以及system prompt等超参配置问题。建议使用最新的vLLM安装步骤和[推理脚本](https://github.com/Tencent-Hunyuan/HunyuanOCR/blob/main/Hunyuan-OCR-master/Hunyuan-OCR-vllm/run_hy_ocr.py)进行效果测试。目前Transformers相比vLLM框架仍然存在一定的精度差异（正在努力修复中）。
+- **[2025/11/25]** 📝 推理代码和模型权重已开源。
 
 ## 📖 简介
 **HunyuanOCR**是一款基于腾讯混元原生多模态架构的端到端OCR专家模型。仅以**1B**轻量化参数，便已斩获多项业界SOTA成绩。该模型精通**复杂多语种文档解析**，同时在**文字检测识别、开放字段信息抽取、视频字幕识别、拍照翻译**等全场景实用技能中表现出色。
