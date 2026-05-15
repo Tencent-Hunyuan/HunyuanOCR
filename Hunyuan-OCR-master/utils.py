@@ -6,6 +6,22 @@ from typing import Tuple, List, Dict
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
+_SPOTTING_COORD_PATTERN = re.compile(r'\((\d+),(\d+)\),\((\d+),(\d+)\)')
+
+
+def _iter_spotting_items(response: str):
+    """Yield text spans and coordinate groups from a spotting response."""
+    text_start = 0
+    for match in _SPOTTING_COORD_PATTERN.finditer(response):
+        text = response[text_start:match.start()].strip()
+        coord_matches = (
+            (match.group(1), match.group(2)),
+            (match.group(3), match.group(4)),
+        )
+        yield text, coord_matches, match
+        text_start = match.end()
+
+
 def clean_repeated_substrings(text):
     """Clean repeated substrings in text"""
     n = len(text)
@@ -69,18 +85,12 @@ def denormalize_coordinates(coord: Tuple[float, float], image_width: int, image_
 def process_spotting_response(response: str, image_width: int, image_height: int) -> str:
     """Process spotting task response and denormalize coordinates"""
     try:
-        # Find all text and coordinate pairs using regex
-        pattern = r'([^()]+)(\(\d+,\d+\),\(\d+,\d+\))'
-        matches = re.finditer(pattern, response)
-        
-        new_response = response
-        for match in matches:
-            text = match.group(1).strip()
-            coords = match.group(2)
-            
+        new_response_parts = []
+        last_end = 0
+        for _text, coord_matches, match in _iter_spotting_items(response):
+            new_response_parts.append(response[last_end:match.start()])
+
             # Parse the two coordinate points 
-            coord_pattern = r'\((\d+),(\d+)\)'
-            coord_matches = re.findall(coord_pattern, coords)
             if len(coord_matches) == 2:
                 start_coord = (float(coord_matches[0][0]), float(coord_matches[0][1]))
                 end_coord = (float(coord_matches[1][0]), float(coord_matches[1][1]))
@@ -91,11 +101,13 @@ def process_spotting_response(response: str, image_width: int, image_height: int
                 
                 # Build new coordinate string
                 new_coords = f"({denorm_start[0]},{denorm_start[1]}),({denorm_end[0]},{denorm_end[1]})"
-                
-                # Replace coordinates in original response
-                new_response = new_response.replace(coords, new_coords)
-        
-        return new_response
+                new_response_parts.append(new_coords)
+            else:
+                new_response_parts.append(match.group(0))
+            last_end = match.end()
+
+        new_response_parts.append(response[last_end:])
+        return ''.join(new_response_parts)
     
     except Exception as e:
         print(f"Error processing response: {str(e)}")
@@ -116,19 +128,9 @@ def draw_text_detection_boxes(image: Image, response: str) -> Image:
     except IOError:
         font = ImageFont.load_default()
         
-    # Extract text and coordinates using regex
-    pattern = r'([^()]+)(\(\d+,\d+\),\(\d+,\d+\))'
-    matches = re.finditer(pattern, response)
-    
-    for match in matches:
+    # Extract text and coordinates using bbox delimiters, so text may contain parentheses.
+    for text, coord_matches, _match in _iter_spotting_items(response):
         try:
-            text = match.group(1).strip()
-            coords = match.group(2)
-            
-            # Parse coordinates
-            coord_pattern = r'\((\d+),(\d+)\)'
-            coord_matches = re.findall(coord_pattern, coords)
-            
             if len(coord_matches) == 2:
                 x1, y1 = int(coord_matches[0][0]), int(coord_matches[0][1])
                 x2, y2 = int(coord_matches[1][0]), int(coord_matches[1][1])
