@@ -36,7 +36,6 @@ from inference.utils.hunyuan_utils import process_one as _doc_pp  # noqa: E402
 DOC_PARSE_PROMPT = TASK_PROMPTS["doc_parse"]
 
 BASE_URL = "http://127.0.0.1:8080/v1"
-MODEL = "HYVL"
 
 _client = OpenAI(base_url=BASE_URL, api_key="empty")
 
@@ -90,7 +89,7 @@ def chat(
         content = prompt
 
     resp = _client.chat.completions.create(
-        model=MODEL,
+        model=_client.models.list().data[0].id,
         messages=[{"role": "user", "content": content}],
         max_tokens=max_tokens,
         temperature=temperature,
