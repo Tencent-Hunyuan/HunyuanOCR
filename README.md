@@ -18,6 +18,7 @@
 
 ## 🔥 News <!-- omit in toc -->
 
+- **[2026/07/24]** 🚀 We further open-sourced the **unified inference environment** (see [`docs/inference/inference.md`](docs/inference/inference.md)) and the **verl-based reinforcement learning stack** for HunyuanOCR-1.5 (see [`train_verl/README_en.md`](train_verl/README_en.md)).
 - **[2026/07/13]** 📊 We open-sourced [**CHAOS-Bench**](./benchmarks/CHAOS-Bench), a character-level hallucination benchmark that probes the "seeing-is-believing" ability of OCR VLMs by injecting character-level corruptions into academic-paper images.
 - **[2026/07/07]** 🚀 We released **HunyuanOCR-1.5**, a systematic upgrade that makes lightweight end-to-end OCR **faster and better** via DFlash speculative decoding, PC-side llama.cpp deployment, an Agentic Data Flow, and an upgraded training recipe. Check out the [paper](https://arxiv.org/pdf/2607.04884).
 - **[2026/06/18]** 🎉 Our work on table parsing has been accepted to the ECCV 2026 Main Conference! Check out the paper: [StrucTab: A Structured Optimization Framework for Table Parsing](https://arxiv.org/abs/2606.29905).

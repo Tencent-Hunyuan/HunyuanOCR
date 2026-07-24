@@ -1,6 +1,11 @@
 .DS_Store
 .workbuddy
 
+# Upstream verl and the personal fork are separate repositories; keep them
+# out of this tree even if a user clones them here as siblings for local use.
+verl
+verl-HYOCR
+
 # Created by https://www.toptal.com/developers/gitignore/api/python,latex
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,latex
 

@@ -18,6 +18,7 @@
 
 ## 🔥 最新动态 <!-- omit in toc -->
 
+- **[2026/07/24]** 🚀 我们进一步开源了**统一推理环境**（参考 [`docs/inference/inference_zh.md`](docs/inference/inference_zh.md)），以及基于 verl 的**强化学习训练配套**，让 HunyuanOCR-1.5 的 RL 训练开箱可用（参考 [`train_verl/README.md`](train_verl/README.md)）。
 - **[2026/07/13]** 📊 我们开源了 [**CHAOS-Bench**](./benchmarks/CHAOS-Bench)，一个字符级幻觉评测基准：通过在学术论文图像中注入字符级篡改，检验 OCR VLM 的"所见即所得"能力。
 - **[2026/07/07]** 🚀 我们发布 **HunyuanOCR-1.5**，通过 DFlash 投机解码、llama.cpp PC 端部署、Agentic Data Flow 及优化后的训练配方，对轻量级端到端 OCR 进行系统性升级，实现**更快、更强**。详见[论文](https://arxiv.org/pdf/2607.04884)。
 - **[2026/06/18]** 🎉 我们在表格解析方向的研究成果被 ECCV 2026 Main Conference 正式接收！详见论文：[StrucTab: A Structured Optimization Framework for Table Parsing](https://arxiv.org/abs/2606.29905)。
