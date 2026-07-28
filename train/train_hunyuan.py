@@ -14,28 +14,36 @@
 #    See the License for the specific language governing permissions and
 #    limitations under the License.
 
-import os
 import logging
+import os
 import pathlib
+import sys
+
+logger = logging.getLogger(__name__)
+from pathlib import Path
+
 import torch
 import transformers
-import sys
-from pathlib import Path
 
 # 添加项目根目录到Python路径
 project_root = Path(__file__).parent.parent  # 指向 hunyuan_vl_finetune 目录
 sys.path.insert(0, str(project_root))
 
-from train.trainer import replace_hunyuanocr_attention_class
+from transformers import (
+    AutoProcessor,
+    AutoTokenizer,
+    HunYuanVLForConditionalGeneration,
+    Trainer,
+)
 
-from train.data_processor import VLDataCollator, PackedVLDataCollator, VLDataset
 from train.argument import (
-    ModelArguments,
     DataArguments,
+    ModelArguments,
     TrainingArguments,
 )
-from transformers import AutoTokenizer, Trainer, HunYuanVLForConditionalGeneration, AutoProcessor
-import transformers
+from train.data_processor import PackedVLDataCollator, VLDataCollator, VLDataset
+from train.trainer import replace_hunyuanocr_attention_class
+
 transformers.logging.set_verbosity_info()
 
 
@@ -60,7 +68,7 @@ def safe_save_model_for_hf_trainer(trainer: transformers.Trainer, output_dir: st
     if trainer.args.should_save:
         cpu_state_dict = {key: value.cpu() for key, value in state_dict.items()}
         del state_dict
-        trainer._save(output_dir, state_dict=cpu_state_dict)  # noqa
+        trainer._save(output_dir, state_dict=cpu_state_dict)
 
 
 def set_model(model_args, model):
@@ -122,7 +130,9 @@ def train(attn_implementation="flash_attention_2"):
     rank0_print(f"Loading model... with bf16 type: {training_args.bf16}")
     if training_args.from_scratch:
         config_path = model_args.model_name_or_path
-        from transformers.models.hunyuan_vl.configuration_hunyuan_vl import HunYuanVLConfig
+        from transformers.models.hunyuan_vl.configuration_hunyuan_vl import (
+            HunYuanVLConfig,
+        )
         config = HunYuanVLConfig.from_pretrained(config_path)
         config._attn_implementation = attn_implementation
         model = HunYuanVLForConditionalGeneration(config)
@@ -151,7 +161,7 @@ def train(attn_implementation="flash_attention_2"):
             model.get_input_embeddings().register_forward_hook(make_inputs_require_grad)
 
     if training_args.lora_enable:
-        from peft import LoraConfig, get_peft_model, TaskType
+        from peft import LoraConfig, TaskType, get_peft_model
         print("LoRA enabled")
 
         for p in model.parameters():
@@ -209,7 +219,7 @@ def train(attn_implementation="flash_attention_2"):
     )
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
-        logging.info("checkpoint found, resume training")
+        logger.info("checkpoint found, resume training")
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()

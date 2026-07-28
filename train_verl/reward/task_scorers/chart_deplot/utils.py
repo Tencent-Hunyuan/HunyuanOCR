@@ -16,7 +16,7 @@
         - mermaid   -> flowchart_eval
         - md_list   -> tree_eval
 
-评分算法实现位于同目录的 chart_deplot_eval.py（已自包含，无外部依赖）。
+评分算法实现位于同目录的 eval.py（已自包含，无外部依赖）。
 """
 
 from __future__ import annotations
@@ -24,7 +24,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
-from .chart_deplot_eval import (
+from .eval import (
     csv_eval,
     flowchart_eval,
     is_markdown_list,
@@ -147,12 +147,12 @@ def _score_by_format(prediction: str, reference: str, fmt: str) -> tuple[float, 
     return 0.0, info
 
 
-def process_chart_deplot_task(response_a: str, response_b: str) -> dict[str, Any]:
+def process_chart_deplot_task(response: str, ref_answer: str) -> dict[str, Any]:
     """对 chart_deplot 任务的一对 (模型回复, 参考答案) 打分。
 
     Args:
-        response_a: 模型回复
-        response_b: 参考答案
+        response: 模型回复
+        ref_answer: 参考答案
     Returns:
         {
             "analysis": dict 形式的诊断信息（pred/ref 类别、是否一致、各类分数、组件分等），
@@ -163,19 +163,19 @@ def process_chart_deplot_task(response_a: str, response_b: str) -> dict[str, Any
     analysis: dict[str, Any] = {}
 
     # 1) 双方文本兜底
-    if not isinstance(response_a, str):
-        response_a = "" if response_a is None else str(response_a)
-    if not isinstance(response_b, str):
-        response_b = "" if response_b is None else str(response_b)
+    if not isinstance(response, str):
+        response = "" if response is None else str(response)
+    if not isinstance(ref_answer, str):
+        ref_answer = "" if ref_answer is None else str(ref_answer)
 
-    pred_format = detect_chart_format(response_a)
-    ref_format = detect_chart_format(response_b)
+    pred_format = detect_chart_format(response)
+    ref_format = detect_chart_format(ref_answer)
 
     analysis["pred_format"] = pred_format
     analysis["ref_format"] = ref_format
     analysis["format_matched"] = (pred_format == ref_format) and ref_format != "unknown"
-    analysis["pred_preview"] = _truncate(response_a)
-    analysis["ref_preview"] = _truncate(response_b)
+    analysis["pred_preview"] = _truncate(response)
+    analysis["ref_preview"] = _truncate(ref_answer)
 
     # 2) ref 脏数据（极少数样本只有标题没数据等）：丢弃该样本
     if ref_format == "unknown":
@@ -196,7 +196,7 @@ def process_chart_deplot_task(response_a: str, response_b: str) -> dict[str, Any
 
     # 4) 同类：调对应评测函数
     try:
-        reward, score_info = _score_by_format(response_a, response_b, ref_format)
+        reward, score_info = _score_by_format(response, ref_answer, ref_format)
     except Exception as e:
         analysis["error"] = f"scoring failed: {e!r}"
         return {"analysis": analysis, "is_valid": False, "reward": -1.0}

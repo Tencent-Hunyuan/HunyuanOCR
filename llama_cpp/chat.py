@@ -26,12 +26,12 @@ from openai import OpenAI
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(_HERE, ".."))
-from inference.utils.hunyuan_tasks import (  # noqa: E402
+from inference.utils.output_utils import normalize_doc_parse_markdown
+from inference.utils.tasks import (
     TASK_DESCRIPTIONS,
     TASK_PROMPTS,
     get_prompt,
 )
-from inference.utils.hunyuan_utils import process_one as _doc_pp  # noqa: E402
 
 DOC_PARSE_PROMPT = TASK_PROMPTS["doc_parse"]
 
@@ -60,8 +60,8 @@ def _redirect_output_to_log() -> str:
     """Tee stdout/stderr to a timestamped log file in logs/. Returns the path."""
     log_dir = os.path.join(_HERE, "logs")
     os.makedirs(log_dir, exist_ok=True)
-    log_path = os.path.join(log_dir, f"chat_{datetime.now():%Y%m%d_%H%M%S}.log")
-    log_file = open(log_path, "w")
+    log_path = os.path.join(log_dir, f"chat_{datetime.now():%Y%m%d_%H%M%S}.log")  # noqa: DTZ005
+    log_file = open(log_path, "w")  # noqa: SIM115
     sys.stdout = _Tee(sys.__stdout__, log_file)
     sys.stderr = _Tee(sys.__stderr__, log_file)
     return log_path
@@ -76,7 +76,7 @@ def _image_part(path: str) -> dict:
 
 def chat(
     prompt: str,
-    image_paths: list = None,
+    image_paths: list | None = None,
     max_tokens: int = 4096,
     temperature: float = 0,
     top_p: float = 1,
@@ -100,7 +100,7 @@ def chat(
 
 
 def maybe_postprocess(text: str, prompt: str, task_type: str, disable: bool) -> str:
-    """Apply hunyuan_utils.process_one iff the row is a doc_parse task.
+    """Apply output_utils.normalize_doc_parse_markdown iff the row is a doc_parse task.
 
     Matches the gating logic in inference/transformers/infer_hf_8gpu.py:
       * --task-type set   -> apply iff task_type == "doc_parse"
@@ -116,7 +116,7 @@ def maybe_postprocess(text: str, prompt: str, task_type: str, disable: bool) -> 
     if not gate:
         return text
     try:
-        out, _ = _doc_pp(text)
+        out, _ = normalize_doc_parse_markdown(text)
         return out
     except Exception:
         return text
@@ -182,7 +182,7 @@ def _parse_args():
         choices=list(TASK_PROMPTS.keys()),
         help=(
             "force ALL rows to use the official prompt of this task (from "
-            "inference/utils/hunyuan_tasks.py); this also gates doc_parse markdown "
+            "inference/utils/tasks.py); this also gates doc_parse markdown "
             "normalization (only enabled when task_type='doc_parse'). "
             "If unset, each row's 'prompt' field is used (post-processing only "
             "applies to rows whose prompt matches the official doc_parse wording)."
@@ -191,7 +191,7 @@ def _parse_args():
     p.add_argument(
         "--no-doc-postprocess",
         action="store_true",
-        help="disable doc_parse markdown normalization (hunyuan_utils.process_one).",
+        help="disable doc_parse markdown normalization (output_utils.normalize_doc_parse_markdown).",
     )
     p.add_argument("--max-requests", type=int, default=None, help="cap total requests (default: unlimited)")
     p.add_argument(

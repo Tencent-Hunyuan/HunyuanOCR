@@ -61,14 +61,14 @@ def compute_score(
         solution_str: rollout response text (verl-native kwarg name).
         ground_truth: reference answer text (verl-native kwarg name).
         extra_info: parquet ``extra_info`` column. Reads ``task_type`` (required
-            for reward dispatch), ``img_path`` (optional; kept so
-            RLLoggingBoard can display it), and translation-only
-            ``source_lang_text`` / ``target_lang``.
+            for reward dispatch), ``question`` (used only by the vqa /
+            translation judge templates; other tasks may leave it empty),
+            and translation-only ``source_lang_text`` / ``target_lang``.
         response: legacy alias for ``solution_str``.
         ref_answer: legacy alias for ``ground_truth``.
 
     Returns:
-        {"score", "acc", "reward_func", "analysis"} dict.
+        ``{"score", "acc", "reward_func", "analysis"}`` dict.
     """
     if solution_str is None:
         solution_str = response or ""
@@ -79,7 +79,6 @@ def compute_score(
     task_type = extra.get("task_type", "")
 
     scoring_obj = {
-        "image_path": extra.get("img_path", ""),
         "prompt": extra.get("question", ""),
         "response": solution_str,
         "ref_answer": ground_truth,
@@ -108,6 +107,6 @@ def compute_score(
     return {
         "score": reward,
         "acc": 1.0 if reward > 0.0 else 0.0,
-        "reward_func": data_source or "unknown",
+        "reward_func": task_type or data_source or "unknown",
         "analysis": analysis,
     }

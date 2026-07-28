@@ -1,7 +1,7 @@
 """
-hunyuan_vl_dflash_v2.py — Variant of hunyuan_vl_dflash.MYDraft that supports
+dflash_draft_resume.py — Variant of dflash_draft.MYDraft that supports
 **initializing the draft model from an existing DFlash checkpoint directory**
-(e.g. yongkun's v1 dflash checkpoint).
+(e.g. a previously released DFlash checkpoint).
 
 Differences from the original ``MYDraft``:
   1. ``__init__`` no longer copies weights from the last K target layers of the
@@ -18,7 +18,7 @@ Everything else (forward pass, loss, etc.) is reused unchanged via subclass.
 
 Usage (in train_draft_from_dflash.py)::
 
-    from train.hunyuan_vl_dflash_v2 import MYDraftFromDFlash
+    from train.dflash_draft_resume import MYDraftFromDFlash
     model = MYDraftFromDFlash(
         config=target_model.config,
         target_model=target_model,
@@ -34,7 +34,6 @@ from __future__ import annotations
 import os
 import sys
 from pathlib import Path
-from typing import Optional
 
 import torch
 from torch import nn
@@ -44,7 +43,7 @@ from transformers import AutoConfig
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from train.hunyuan_vl_dflash import MYDraft, DFlashDraftModel  # noqa: E402
+from train.dflash_draft import DFlashDraftModel, MYDraft
 
 
 class MYDraftFromDFlash(MYDraft):
@@ -56,7 +55,7 @@ class MYDraftFromDFlash(MYDraft):
         self,
         config,
         target_model: nn.Module,
-        dflash_init_dir: Optional[str] = None,
+        dflash_init_dir: str | None = None,
         num_draft_layers: int = 5,
         only_draft: bool = False,
         use_distill: bool = False,
@@ -74,6 +73,7 @@ class MYDraftFromDFlash(MYDraft):
         # (Qwen3PreTrainedModel.__init__) directly.
         # Equivalently: invoke nn.Module's grandparent init via PreTrainedModel.
         from transformers.models.qwen3.modeling_qwen3 import Qwen3PreTrainedModel
+
         Qwen3PreTrainedModel.__init__(self, config)
 
         self.config = config
@@ -103,8 +103,7 @@ class MYDraftFromDFlash(MYDraft):
                 "HYOCR_DFLASH_CONFIG_DIR",
                 str(Path(__file__).parent / "configs"),
             )
-            print(f"[MYDraftFromDFlash] dflash_init_dir not given, "
-                  f"falling back to template config dir: {cfg_dir}")
+            print(f"[MYDraftFromDFlash] dflash_init_dir not given, falling back to template config dir: {cfg_dir}")
 
         config_dflash = AutoConfig.from_pretrained(cfg_dir, trust_remote_code=True)
         config_dflash._attn_implementation = "flex_attention"
@@ -121,8 +120,10 @@ class MYDraftFromDFlash(MYDraft):
         if dflash_init_dir is not None:
             self._load_draft_weights_from_dir(dflash_init_dir)
         else:
-            print("[MYDraftFromDFlash] No dflash_init_dir, draft weights "
-                  "are randomly initialized (you probably don't want this).")
+            print(
+                "[MYDraftFromDFlash] No dflash_init_dir, draft weights "
+                "are randomly initialized (you probably don't want this)."
+            )
 
     # ------------------------------------------------------------------
     # Draft weight loader
@@ -141,15 +142,14 @@ class MYDraftFromDFlash(MYDraft):
         ]
         weight_path = next((p for p in candidates if os.path.isfile(p)), None)
         if weight_path is None:
-            raise FileNotFoundError(
-                f"No model.safetensors or pytorch_model.bin found in {dflash_dir}"
-            )
+            raise FileNotFoundError(f"No model.safetensors or pytorch_model.bin found in {dflash_dir}")
 
         print(f"[MYDraftFromDFlash] Loading draft weights from: {weight_path}")
 
         # Load state dict
         if weight_path.endswith(".safetensors"):
             from safetensors.torch import load_file as safetensors_load_file
+
             raw_state_dict = safetensors_load_file(weight_path, device="cpu")
         else:
             raw_state_dict = torch.load(weight_path, map_location="cpu")
@@ -159,26 +159,25 @@ class MYDraftFromDFlash(MYDraft):
         normalized = {}
         for k, v in raw_state_dict.items():
             if k.startswith("draft_model."):
-                normalized[k[len("draft_model."):]] = v
+                normalized[k[len("draft_model.") :]] = v
             elif k.startswith("target_model."):
                 # Should not appear in a draft-only checkpoint, but skip if so.
                 continue
             else:
                 normalized[k] = v
 
-        missing, unexpected = self.draft_model.load_state_dict(
-            normalized, strict=False
-        )
+        missing, unexpected = self.draft_model.load_state_dict(normalized, strict=False)
 
         # Report load result on rank 0 only (best-effort).
         try:
             import torch.distributed as dist
+
             rank = dist.get_rank() if dist.is_initialized() else 0
         except Exception:
             rank = 0
 
         if rank == 0:
-            print(f"[MYDraftFromDFlash] State-dict load complete:")
+            print("[MYDraftFromDFlash] State-dict load complete:")
             print(f"  - Source keys                : {len(raw_state_dict)}")
             print(f"  - After prefix normalization : {len(normalized)}")
             print(f"  - Missing in draft_model     : {len(missing)}")
@@ -197,5 +196,4 @@ class MYDraftFromDFlash(MYDraft):
             if not missing and not unexpected:
                 print("  [OK] Clean load.")
             else:
-                print("  [WARN] State-dict mismatch detected — verify the "
-                      "checkpoint matches the current architecture.")
+                print("  [WARN] State-dict mismatch detected — verify the checkpoint matches the current architecture.")

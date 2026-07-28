@@ -8,6 +8,17 @@ officially recommended wording for its task.
 
 To add/adjust a task, edit this file only — the client and any batch runner
 import `TASK_PROMPTS` from here.
+
+Note on "task_type" scope:
+    The 12 keys below (``doc_parse`` / ``spotting_json`` / ``layout`` / ...)
+    are **inference-time prompt variants** exposed via the ``--task-type`` CLI
+    flag. They pick which official prompt to send to the model.
+
+    The reward system under ``train_verl/`` defines a separate, coarser set
+    of 7 training task categories (``Spotting`` / ``Layout`` / ``Parsing`` /
+    ``IE`` / ``Translation`` / ``VQA`` / ``chart_deplot``) which drives reward
+    dispatch during RL training. The two vocabularies live at different
+    abstraction levels and are not interchangeable.
 """
 
 TASK_PROMPTS = {

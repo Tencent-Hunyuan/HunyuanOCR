@@ -1,7 +1,7 @@
 """HunyuanOCR-1.5 vLLM 批量推理 (多端点并发)。
-后处理逻辑与单图 infer_vllm_client.py 同源: 直接 import hunyuan_utils / hunyuan_tasks,
+后处理逻辑与单图 infer_vllm_client.py 同源: 直接 import output_utils / tasks,
 不再内嵌副本。prompt 锁定为 --task-type。doc_parse 时默认做 markdown 规整
-(process_one), 可用 --no-doc-postprocess 关闭。
+(normalize_doc_parse_markdown), 可用 --no-doc-postprocess 关闭。
 """
 
 import argparse
@@ -14,13 +14,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from openai import OpenAI
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from utils.hunyuan_tasks import DEFAULT_TASK, TASK_PROMPTS, get_prompt
-from utils.hunyuan_utils import (
+from utils.output_utils import (
     clean_repeated_substrings,
     encode_image_as_data_url,
     infer_stream,
+    normalize_doc_parse_markdown,
 )
-from utils.hunyuan_utils import process_one as doc_parse_normalize
+from utils.tasks import DEFAULT_TASK, TASK_PROMPTS, get_prompt
 
 EXTS = (".png", ".jpg", ".jpeg", ".webp", ".bmp")
 
@@ -36,19 +36,19 @@ def run_one(client, model, img_path, prompt, max_tokens, rep_pen, repeat_min, do
             ],
         },
     ]
-    common = dict(
-        model=model,
-        messages=messages,
-        max_tokens=max_tokens,
-        temperature=0.0,
-        top_p=1.0,
-        extra_body={"top_k": -1, "repetition_penalty": rep_pen, "skip_special_tokens": True},
-    )
+    common = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.0,
+        "top_p": 1.0,
+        "extra_body": {"top_k": -1, "repetition_penalty": rep_pen, "skip_special_tokens": True},
+    }
     text, early = infer_stream(client, common, repeat_min)
     text = clean_repeated_substrings(text)
     pp_stats = None
     if do_doc_pp:
-        text, pp_stats = doc_parse_normalize(text)
+        text, pp_stats = normalize_doc_parse_markdown(text)
     return text, early, pp_stats
 
 
@@ -90,7 +90,9 @@ def main():
         todo.append(f)
     print(f"[info] total={len(imgs)} skip={len(imgs) - len(todo)} todo={len(todo)}", flush=True)
 
-    jsonl = open(os.path.join(args.out_dir, "results.jsonl"), "a", encoding="utf-8")
+    # Shared jsonl handle used by the nested worker under a thread pool; a
+    # context manager would close it before the workers finish.
+    jsonl = open(os.path.join(args.out_dir, "results.jsonl"), "a", encoding="utf-8")  # noqa: SIM115
     st = {"n": 0, "ok": 0, "err": 0, "early": 0, "pp": 0, "t0": time.time()}
 
     def work(item):
@@ -117,7 +119,7 @@ def main():
                 "image": fname,
                 "chars": len(text),
                 "early_stopped": early,
-                "doc_pp": {k: v for k, v in (pp or {}).items() if v},
+                "normalize_doc_parse_markdown": {k: v for k, v in (pp or {}).items() if v},
                 "latency": round(time.time() - t, 2),
                 "ok": True,
                 "_pp_applied": pp_applied,

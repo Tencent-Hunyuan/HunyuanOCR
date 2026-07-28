@@ -1,6 +1,7 @@
+
 import torch
-from typing import Optional
-from datasets import load_dataset, Features, Sequence, Value
+from datasets import Features, Sequence, Value, load_dataset
+
 
 def build_target_layer_ids(num_target_layers: int, num_draft_layers: int):
     if num_draft_layers == 1:
@@ -9,14 +10,14 @@ def build_target_layer_ids(num_target_layers: int, num_draft_layers: int):
     end = num_target_layers - 3
     span = end - start
     target_layer_ids = [
-        int(round(start + (i * span) / (num_draft_layers - 1)))
+        round(start + (i * span) / (num_draft_layers - 1))
         for i in range(num_draft_layers)
     ]
     return target_layer_ids
 
 def extract_context_feature(
     hidden_states: list[torch.Tensor],
-    layer_ids: Optional[list[int]],
+    layer_ids: list[int] | None,
 ) -> torch.Tensor:
     offset = 1
     selected_states = []

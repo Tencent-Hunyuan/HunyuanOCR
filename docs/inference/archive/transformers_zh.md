@@ -141,7 +141,7 @@ python infer_hf_8gpu.py \
 | repetition_penalty  | 1.08           | `generate(repetition_penalty=1.08)`                                                |
 | 尾部重复早停        | ✅             | `TailRepetitionStop` StoppingCriteria，复刻 vLLM 流式的 `has_tail_repetition` 逻辑 |
 | 尾部重复清洗        | ✅             | `clean_repeated_substrings`（最终兜底）                                            |
-| doc_parse 规整      | ✅（默认打开） | `hunyuan_utils.process_one`，与 vLLM 客户端共用                                    |
+| doc_parse 规整      | ✅（默认打开） | `output_utils.normalize_doc_parse_markdown`，与 vLLM 客户端共用                    |
 | skip_special_tokens | True           | `batch_decode(skip_special_tokens=True)`                                           |
 
 模型加载沿用 HunyuanOCR 官方 HuggingFace 推理示例的做法：`HunYuanVLForConditionalGeneration` + `AutoProcessor`，`dtype=bfloat16`，`attn_implementation=eager`，并对老版 tokenizer 快照做了 video-token 补丁。
@@ -155,6 +155,6 @@ inference/transformers/
 └── infer_hf_8gpu.py   # 多卡 transformers 推理（自包含：加载 / 早停 / 清洗）
 ```
 
-> doc_parse markdown 规整（`process_one`）从 `inference/utils/hunyuan_utils.py` 导入，三个环境（`inference/vLLM/`、`inference/DFlash/`、`inference/transformers/`）共用同一份。
+> doc_parse markdown 规整（`normalize_doc_parse_markdown`）从 `inference/utils/output_utils.py` 导入，三个环境（`inference/vLLM/`、`inference/DFlash/`、`inference/transformers/`）共用同一份。
 
 > 图片分辨率使用模型默认（`max_pixels ≈ 4096×4096`），无需配置。

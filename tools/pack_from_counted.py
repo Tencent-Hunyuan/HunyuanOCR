@@ -31,15 +31,13 @@ Usage examples:
       --pack-length 20480
 """
 
-import json
-import os
 import argparse
+import json
 import random
 import time
 from pathlib import Path
 
 import binpacking
-from tqdm import tqdm
 
 
 # ---------------------------------------------------------------------------
@@ -54,19 +52,19 @@ def pack_data(data_list: list, pack_length: int, batch_size: int = 1024) -> list
     for i in range(0, len(data_list), batch_size):
         batch = data_list[i : i + batch_size]
         lengths = [d["num_tokens"] for d in batch]
-        grouped = binpacking.to_constant_volume(
-            list(enumerate(lengths)), pack_length, weight_pos=1
-        )
+        grouped = binpacking.to_constant_volume(list(enumerate(lengths)), pack_length, weight_pos=1)
         for group in grouped:
             group_data = []
             for idx, _ in group:
                 item = batch[idx]
-                group_data.append({
-                    "image": item["image"],
-                    "question": item["question"],
-                    "answer": item["answer"],
-                    "num_tokens": item["num_tokens"],
-                })
+                group_data.append(
+                    {
+                        "image": item["image"],
+                        "question": item["question"],
+                        "answer": item["answer"],
+                        "num_tokens": item["num_tokens"],
+                    }
+                )
             all_packed.append(group_data)
     return all_packed
 
@@ -122,8 +120,10 @@ def collect_samples(jsonl_paths: list, pack_length: int) -> list:
                 all_samples.append(item)
                 file_count += 1
 
-        print(f"  {Path(jsonl_path).name}: {file_count} samples loaded"
-              + (f" ({file_skipped} skipped)" if file_skipped > 0 else ""))
+        print(
+            f"  {Path(jsonl_path).name}: {file_count} samples loaded"
+            + (f" ({file_skipped} skipped)" if file_skipped > 0 else "")
+        )
 
     if skipped_zero > 0:
         print(f"\n  Total skipped (num_tokens <= 0): {skipped_zero}")
@@ -137,43 +137,24 @@ def collect_samples(jsonl_paths: list, pack_length: int) -> list:
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(
-        description="Pack pre-counted JSONL files into training bins"
-    )
+    parser = argparse.ArgumentParser(description="Pack pre-counted JSONL files into training bins")
 
     input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--input", type=str, nargs="+", help="One or more pre-counted JSONL file paths")
+    input_group.add_argument("--input-dir", type=str, help="Directory containing *_count.jsonl files")
     input_group.add_argument(
-        "--input", type=str, nargs="+",
-        help="One or more pre-counted JSONL file paths"
-    )
-    input_group.add_argument(
-        "--input-dir", type=str,
-        help="Directory containing *_count.jsonl files"
-    )
-    input_group.add_argument(
-        "--input-list", type=str,
-        help="Path to a txt file containing JSONL file paths (one per line)"
+        "--input-list", type=str, help="Path to a txt file containing JSONL file paths (one per line)"
     )
 
+    parser.add_argument("--pack-output", type=str, required=True, help="Output path for the packed JSONL file")
+    parser.add_argument("--pack-length", type=int, default=20480, help="Max tokens per packed bin (default: 20480)")
+    parser.add_argument("--batch-size", type=int, default=1024, help="Batch size for binpacking (default: 1024)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for shuffling (default: 42)")
     parser.add_argument(
-        "--pack-output", type=str, required=True,
-        help="Output path for the packed JSONL file"
-    )
-    parser.add_argument(
-        "--pack-length", type=int, default=20480,
-        help="Max tokens per packed bin (default: 20480)"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=1024,
-        help="Batch size for binpacking (default: 1024)"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42,
-        help="Random seed for shuffling (default: 42)"
-    )
-    parser.add_argument(
-        "--suffix", type=str, default="_count.jsonl",
-        help="File suffix filter when using --input-dir (default: '_count.jsonl')"
+        "--suffix",
+        type=str,
+        default="_count.jsonl",
+        help="File suffix filter when using --input-dir (default: '_count.jsonl')",
     )
 
     args = parser.parse_args()
@@ -186,12 +167,8 @@ def main():
         if not input_dir.is_dir():
             print(f"Error: {args.input_dir} is not a valid directory.")
             return
-        jsonl_paths = sorted(
-            str(p) for p in input_dir.iterdir()
-            if p.is_file() and p.name.endswith(args.suffix)
-        )
-        print(f"Found {len(jsonl_paths)} files matching '*{args.suffix}' "
-              f"in {input_dir}")
+        jsonl_paths = sorted(str(p) for p in input_dir.iterdir() if p.is_file() and p.name.endswith(args.suffix))
+        print(f"Found {len(jsonl_paths)} files matching '*{args.suffix}' in {input_dir}")
     elif args.input_list:
         jsonl_paths = [str(p) for p in read_input_list(Path(args.input_list))]
     else:
@@ -247,9 +224,7 @@ def main():
     avg_per_group = total_items / len(packed) if packed else 0
 
     # Token statistics
-    total_tokens = sum(
-        item["num_tokens"] for group in packed for item in group
-    )
+    total_tokens = sum(item["num_tokens"] for group in packed for item in group)
     avg_tokens_per_group = total_tokens / len(packed) if packed else 0
 
     print(f"Packing done in {pack_elapsed:.2f}s")
@@ -267,8 +242,7 @@ def main():
     pack_output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(pack_output_path, "w", encoding="utf-8") as f:
-        for group in packed:
-            f.write(json.dumps(group, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(group, ensure_ascii=False) + "\n" for group in packed)
 
     total_elapsed = time.time() - start_time
     print(f"\n{'=' * 60}")

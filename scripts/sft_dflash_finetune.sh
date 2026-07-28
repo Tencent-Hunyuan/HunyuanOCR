@@ -5,14 +5,15 @@
 # Use this when you have a pre-trained DFlash draft (e.g. our released v1) and
 # want to adapt it to a smaller / domain-specific OCR dataset.
 #
-# Recommended profile ("v3" in our internal experiments):
+# Recommended profile:
 #   - lr        = 2e-5  (5× smaller than from-scratch; finetune LR)
 #   - epochs    = 10    (small data → more passes needed)
 #   - warmup    = 0.05  (slightly longer warmup for stability)
 #   - save_steps = 500  (~10 ckpts over full run)
 #
-# Empirical result on 14.7k packs: v3 beats v1 (1M packs from-scratch) on both
-# acceptance rate (42% vs 33%) and end-to-end speedup (2.14× vs 1.92×).
+# Empirical result on 14.7k packs: this continue-finetune profile beats the
+# from-scratch baseline (1M packs) on both acceptance rate (42% vs 33%) and
+# end-to-end speedup (2.14× vs 1.92×).
 # ============================================================================
 
 set -e

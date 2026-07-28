@@ -1,4 +1,4 @@
-"""Judge prompt templates for GenRM-style scoring (translation + VQA)."""
+"""Judge prompt templates for judge-model scoring (translation + VQA)."""
 
 JUDGE_SYSTEM_PROMPT = "You are a helpful and precise assistant for checking the consistency of answers."
 

@@ -61,7 +61,8 @@ train_verl/
 │   │   ├── spotting.py                 # text spotting
 │   │   ├── layout.py                   # layout analysis
 │   │   ├── parsing.py                  # generic parsing
-│   │   ├── ie/ie_eval.py               # information extraction (JSON field-level + parsing fallback)
+│   │   ├── text_metrics.py             # shared text utilities across scorers
+│   │   ├── ie/eval.py                  # information extraction (JSON field-level + parsing fallback)
 │   │   └── chart_deplot/               # chart deplot (csv / mermaid / md-list)
 │   └── utils/                          # generic helpers (prompt / request / server / judge_server_routes.json)
 │
@@ -132,7 +133,7 @@ Required fields:
 - `ref_answer`: the reference answer.
 - `prompt`: a plain text prompt, or a full chat-messages list. When omitted, the script prepends one `<image>` placeholder per image in a single user turn.
 - `question`: the user question at rollout time. vqa / translation splice it into the judge prompt; rule-based tasks may pass an empty string, but the field itself must be present.
-- `task_type`: the key field that drives reward dispatch. Values: `spotting` / `layout` / `parsing` / `ie` / `chart_deplot` / `translation` / `vqa`. If a file contains a single task, you may omit this field per record and pass `--task-type` on the CLI to stamp all rows uniformly.
+- `task_type`: the key field that drives reward dispatch. Values: `Spotting` / `Layout` / `Parsing` / `IE` / `chart_deplot` / `Translation` / `VQA` (or the Chinese aliases `检测识别` / `版面分析` / `通用解析` / `信息抽取` / `图表解析` / `翻译` / `视觉问答`). If a file contains a single task, you may omit this field per record and pass `--task-type` on the CLI to stamp all rows uniformly.
 
 Optional fields:
 
@@ -245,17 +246,17 @@ bash train_grpo.sh
 
 The most commonly tweaked ones, overridable via env:
 
-| Variable                     | Default                     | Meaning                                                     |
-| :--------------------------- | :-------------------------- | :---------------------------------------------------------- |
-| `MODEL_PATH`                 | `/path/to/HunyuanOCR/model` | HunyuanOCR-1.5 weights directory (HF format)                |
-| `TRAIN_FILES`                | `/path/to/train.parquet`    | training parquet                                            |
-| `VAL_FILES`                  | `/path/to/val.parquet`      | validation parquet                                          |
-| `OUTPUT_DIR`                 | `./outputs`                 | root directory for training artefacts                       |
-| `NNODES`                     | `2`                         | number of nodes                                             |
-| `NGPUS_PER_NODE`             | `8`                         | GPUs per node                                               |
-| `PROJECT_NAME`               | `hyocr_1_5_verl`            | project name (organises the output sub-directory)           |
-| `EXPERIMENT_NAME`            | `hyocr_1_5_grpo`            | experiment name                                             |
-| `REWARD_FN_PATH`             | `./reward_ocr.py`           | path to the reward function file                            |
+| Variable                     | Default                     | Meaning                                                          |
+| :--------------------------- | :-------------------------- | :--------------------------------------------------------------- |
+| `MODEL_PATH`                 | `/path/to/HunyuanOCR/model` | HunyuanOCR-1.5 weights directory (HF format)                     |
+| `TRAIN_FILES`                | `/path/to/train.parquet`    | training parquet                                                 |
+| `VAL_FILES`                  | `/path/to/val.parquet`      | validation parquet                                               |
+| `OUTPUT_DIR`                 | `./outputs`                 | root directory for training artefacts                            |
+| `NNODES`                     | `2`                         | number of nodes                                                  |
+| `NGPUS_PER_NODE`             | `8`                         | GPUs per node                                                    |
+| `PROJECT_NAME`               | `hyocr_1_5_verl`            | project name (organises the output sub-directory)                |
+| `EXPERIMENT_NAME`            | `hyocr_1_5_grpo`            | experiment name                                                  |
+| `REWARD_FN_PATH`             | `./reward_ocr.py`           | path to the reward function file                                 |
 | `RM_SYSTEM_JUDGE_MODEL_NAME` | `Qwen/Qwen3-30B-A3B`        | judge model name; must match a key in `judge_server_routes.json` |
 
 Single-node 8-GPU example:
@@ -314,17 +315,19 @@ compute_score(data_source, solution_str, ground_truth, extra_info)
 
 ### 6.2 Scoring Policy per Task Type <!-- omit in toc -->
 
-| Task         | Dispatch condition (`TaskType.is_xxx`) | Scoring method                                                                          |
-| :----------- | :------------------------------------- | :-------------------------------------------------------------------------------------- |
-| spotting     | `"spotting"` / `"检测识别"`            | Rule: format detection + IoU matching + normalised edit distance                        |
-| layout       | `"layout"` / `"版面分析"`              | Rule: hy-meta / JSON dual format, F1 mode or edit-distance mode                         |
-| parsing      | `"parsing"` / `"通用解析"`             | Rule: character accuracy + TEDS table score                                             |
-| ie           | `"ie"` / `"信息抽取"`                  | Rule: JSON field-level exact_match + edit-distance; falls back to parsing when ref is non-JSON |
-| chart_deplot | `"chart_deplot"` / `"图表解析"`        | Rule: dispatch by ref format to csv / tree / flowchart evaluation                       |
-| translation  | `"translation"` / `"翻译"`             | Judge model: 0-5 score mapped to `[0, 1]` by piecewise linear transform                 |
-| vqa          | `"vqa"` / `"视觉问答"`                 | Judge model: judgement 0 / 1                                                            |
+| Task         | Dispatch condition (`TaskType.is_xxx`) | Scoring method                                                                                 |
+| :----------- | :------------------------------------- | :--------------------------------------------------------------------------------------------- |
+| spotting     | `"Spotting"` / `"检测识别"`            | Rule: format detection + IoU matching + normalised edit distance                               |
+| layout       | `"Layout"` / `"版面分析"`              | Rule: hy-meta / JSON dual format, F1 mode or edit-distance mode                                |
+| parsing      | `"Parsing"` / `"通用解析"`             | Rule: character accuracy + TEDS table score                                                    |
+| ie           | `"IE"` / `"信息抽取"`                  | Rule: JSON field-level exact_match + edit-distance; falls back to parsing when ref is non-JSON |
+| chart_deplot | `"chart_deplot"` / `"图表解析"`        | Rule: dispatch by ref format to csv / tree / flowchart evaluation                              |
+| translation  | `"Translation"` / `"翻译"`             | Judge model: 0-5 score mapped to `[0, 1]` by piecewise linear transform                        |
+| vqa          | `"VQA"` / `"视觉问答"`                 | Judge model: judgement 0 / 1                                                                   |
 
 Matching uses substring containment (English alias with case-insensitive match, Chinese alias verbatim), so any task_type string that contains the relevant keyword hits the right branch.
+
+> **Relation to the inference-side `task_type`**: the 12 `task_type` keys in `inference/utils/tasks.py` (`doc_parse` / `spotting_json` / `layout_parse` / ...) are **inference-time prompt variants** selected via `--task-type` to pick the official prompt sent to the model. The 7 training categories here are **RL reward dispatch routes**. The two vocabularies live at different abstraction levels ("which instruction to send" vs. "which reward rule to apply") and are not interchangeable.
 
 ### 6.3 Adding a New Task <!-- omit in toc -->
 

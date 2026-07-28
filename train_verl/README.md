@@ -12,7 +12,7 @@
 
 - [1. 目录结构](#1-目录结构)
 - [2. 环境准备](#2-环境准备)
-- [3. Judge server 部署](#3-judge-server-部署)
+- [3. Judge Server 部署](#3-judge-server-部署)
 - [4. Ray 集群](#4-ray-集群)
 - [5. 启动训练](#5-启动训练)
 - [6. Reward 系统](#6-reward-系统)
@@ -61,7 +61,8 @@ train_verl/
 │   │   ├── spotting.py                 # 检测识别
 │   │   ├── layout.py                   # 版面分析
 │   │   ├── parsing.py                  # 通用解析
-│   │   ├── ie/ie_eval.py               # 信息抽取（JSON 字段级评分 + parsing fallback）
+│   │   ├── text_metrics.py             # 跨 scorer 共享的文本工具
+│   │   ├── ie/eval.py                  # 信息抽取（JSON 字段级评分 + parsing fallback）
 │   │   └── chart_deplot/               # 图表解析（csv / mermaid / md-list）
 │   └── utils/                          # 通用 helper（prompt / request / server / judge_server_routes.json）
 │
@@ -132,7 +133,7 @@ fork 的仓库名是 `verl-HYOCR`，但训练脚本以 `python -m verl.trainer.m
 - `ref_answer`：参考答案
 - `prompt`：文本 prompt，或完整的 chat messages list。缺省时脚本会在单条 user turn 前面按图数量拼 `<image>` 占位符。
 - `question`：rollout 时的用户问题；vqa / translation 会拼进 judge 提示词，rule-based 任务写空串亦可，字段必须存在。
-- `task_type`：驱动 reward 分发的关键字段，取值：`spotting` / `layout` / `parsing` / `ie` / `chart_deplot` / `translation` / `vqa`。若整个文件是同一任务，可以在源 JSONL 里省略这个字段，用命令行 `--task-type` 统一打标。
+- `task_type`：驱动 reward 分发的关键字段，取值：`Spotting` / `Layout` / `Parsing` / `IE` / `chart_deplot` / `Translation` / `VQA`（或对应中文别名 `检测识别` / `版面分析` / `通用解析` / `信息抽取` / `图表解析` / `翻译` / `视觉问答`）。若整个文件是同一任务，可以在源 JSONL 里省略这个字段，用命令行 `--task-type` 统一打标。
 
 可选字段：
 
@@ -170,7 +171,7 @@ python data/prepare_data.py \
 
 ---
 
-## 3. Judge server 部署
+## 3. Judge Server 部署
 
 Translation 与 VQA 两类任务通过 **judge 模型**打分；其余五类走本地规则打分，无需 judge。因此若你的训练数据里包含 translation / vqa 样本，需要额外把 judge server 起起来。
 
@@ -245,17 +246,17 @@ bash train_grpo.sh
 
 顶层几项是最常调整的，通过 env 覆盖：
 
-| 变量                         | 默认                        | 含义                                                 |
-| :--------------------------- | :-------------------------- | :--------------------------------------------------- |
-| `MODEL_PATH`                 | `/path/to/HunyuanOCR/model` | HunyuanOCR-1.5 权重目录（HF 格式）                   |
-| `TRAIN_FILES`                | `/path/to/train.parquet`    | 训练 parquet                                         |
-| `VAL_FILES`                  | `/path/to/val.parquet`      | 验证 parquet                                         |
-| `OUTPUT_DIR`                 | `./outputs`                 | 训练产物根目录                                       |
-| `NNODES`                     | `2`                         | 节点数                                               |
-| `NGPUS_PER_NODE`             | `8`                         | 每节点 GPU 数                                        |
-| `PROJECT_NAME`               | `hyocr_1_5_verl`            | 项目名（用于组织输出子目录）                         |
-| `EXPERIMENT_NAME`            | `hyocr_1_5_grpo`            | 实验名                                               |
-| `REWARD_FN_PATH`             | `./reward_ocr.py`           | reward 函数文件路径                                  |
+| 变量                         | 默认                        | 含义                                                   |
+| :--------------------------- | :-------------------------- | :----------------------------------------------------- |
+| `MODEL_PATH`                 | `/path/to/HunyuanOCR/model` | HunyuanOCR-1.5 权重目录（HF 格式）                     |
+| `TRAIN_FILES`                | `/path/to/train.parquet`    | 训练 parquet                                           |
+| `VAL_FILES`                  | `/path/to/val.parquet`      | 验证 parquet                                           |
+| `OUTPUT_DIR`                 | `./outputs`                 | 训练产物根目录                                         |
+| `NNODES`                     | `2`                         | 节点数                                                 |
+| `NGPUS_PER_NODE`             | `8`                         | 每节点 GPU 数                                          |
+| `PROJECT_NAME`               | `hyocr_1_5_verl`            | 项目名（用于组织输出子目录）                           |
+| `EXPERIMENT_NAME`            | `hyocr_1_5_grpo`            | 实验名                                                 |
+| `REWARD_FN_PATH`             | `./reward_ocr.py`           | reward 函数文件路径                                    |
 | `RM_SYSTEM_JUDGE_MODEL_NAME` | `Qwen/Qwen3-30B-A3B`        | Judge 模型名，需匹配 `judge_server_routes.json` 的 key |
 
 单机 8 卡示例：
@@ -316,15 +317,17 @@ compute_score(data_source, solution_str, ground_truth, extra_info)
 
 | Task         | 分发条件（`TaskType.is_xxx`）   | 打分方式                                                                          |
 | :----------- | :------------------------------ | :-------------------------------------------------------------------------------- |
-| spotting     | `"spotting"` / `"检测识别"`     | 规则：格式探测 + IoU 匹配 + 归一化编辑距离                                        |
-| layout       | `"layout"` / `"版面分析"`       | 规则：hy-meta / JSON 双格式，F1 模式 or 编辑距离模式                              |
-| parsing      | `"parsing"` / `"通用解析"`      | 规则：字符准确率 + TEDS 表格评分                                                  |
-| ie           | `"ie"` / `"信息抽取"`           | 规则：JSON 字段级 exact_match + edit-distance；ref 非 JSON 时 fallback 到 parsing |
+| spotting     | `"Spotting"` / `"检测识别"`     | 规则：格式探测 + IoU 匹配 + 归一化编辑距离                                        |
+| layout       | `"Layout"` / `"版面分析"`       | 规则：hy-meta / JSON 双格式，F1 模式 or 编辑距离模式                              |
+| parsing      | `"Parsing"` / `"通用解析"`      | 规则：字符准确率 + TEDS 表格评分                                                  |
+| ie           | `"IE"` / `"信息抽取"`           | 规则：JSON 字段级 exact_match + edit-distance；ref 非 JSON 时 fallback 到 parsing |
 | chart_deplot | `"chart_deplot"` / `"图表解析"` | 规则：按 ref 格式分发到 csv / tree / flowchart 评测                               |
-| translation  | `"translation"` / `"翻译"`      | Judge 模型：0-5 分再按分段线性映射到 [0, 1]                                       |
-| vqa          | `"vqa"` / `"视觉问答"`          | Judge 模型：Judgement 0 / 1                                                       |
+| translation  | `"Translation"` / `"翻译"`      | Judge 模型：0-5 分再按分段线性映射到 [0, 1]                                       |
+| vqa          | `"VQA"` / `"视觉问答"`          | Judge 模型：Judgement 0 / 1                                                       |
 
 判定采用 substring 包含（英文别名 case-insensitive 匹配 + 中文别名字面量匹配），只要 task_type 包含对应关键词就会命中相应分支。
+
+> **和 inference 侧 `task_type` 的区别**：`inference/utils/tasks.py` 里的 12 个 `task_type`（`doc_parse` / `spotting_json` / `layout_parse` / ...）是**推理时的 prompt 变体**，通过 `--task-type` 选择对模型下发的官方 prompt。而这里的 7 个训练类别是**RL reward 分发路由**。两套词表处于不同抽象层次：一个是"给模型什么指令"，一个是"用哪套 reward 规则给这批答案打分"，不能互相替代。
 
 ### 6.3 自定义新任务 <!-- omit in toc -->
 

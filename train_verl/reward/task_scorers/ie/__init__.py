@@ -7,6 +7,6 @@ Entry function: ``process_ie_task(response, ref_answer)``
   local scorer.
 """
 
-from .ie_eval import process_ie_task
+from .eval import process_ie_task
 
 __all__ = ["process_ie_task"]

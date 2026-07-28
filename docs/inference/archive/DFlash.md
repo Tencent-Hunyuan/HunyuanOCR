@@ -290,7 +290,7 @@ Stop the server: `pkill -9 -f "VLLM::EngineCore"; pkill -9 -f "vllm serve"`
 > AR and DFlash share the same clients — `inference/vLLM/infer_vllm_client.py`
 > (single image) and `inference/vLLM/batch_infer.py` (batch). They import the
 > shared task prompts + output utilities from
-> `inference/utils/hunyuan_tasks.py` and `inference/utils/hunyuan_utils.py`
+> `inference/utils/tasks.py` and `inference/utils/output_utils.py`
 > (a single copy). Sampling parameters, task prompts, and post-processing are
 > therefore identical, so AR / DFlash / transformers outputs are directly
 > comparable.
@@ -361,7 +361,7 @@ inference/vLLM/             # shared with the AR path (see archive/vLLM.md)
 > committed to Git; it comes from the `dflash/` subfolder of the HF model repo
 > and is downloaded together with the base model (see §2).
 
-> Shared helpers (`hunyuan_tasks.py` = task_type → prompt, `hunyuan_utils.py` =
+> Shared helpers (`tasks.py` = task_type → prompt, `output_utils.py` =
 > output utils incl. doc_parse normalization) live in a single copy at
 > `inference/utils/` and are imported by all three setups (A/B/C).
 

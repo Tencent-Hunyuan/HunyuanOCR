@@ -44,10 +44,10 @@ import math
 import os
 import sys
 import time
-from typing import List
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-from utils.hunyuan_tasks import (
+from utils.output_utils import normalize_doc_parse_markdown
+from utils.tasks import (
     DEFAULT_TASK,
     TASK_DESCRIPTIONS,
     TASK_PROMPTS,
@@ -103,7 +103,7 @@ def clean_repeated_substrings(text: str, min_repeats: int = 10) -> str:
 # ============================================================================
 # I/O helpers
 # ============================================================================
-def split_jsonl(input_path: str, num_parts: int) -> List[List[dict]]:
+def split_jsonl(input_path: str, num_parts: int) -> list[list[dict]]:
     """Read a JSONL file and split it evenly into `num_parts` chunks."""
     with open(input_path, encoding="utf-8") as f:
         data = [json.loads(line) for line in f if line.strip()]
@@ -279,7 +279,7 @@ def worker_main(
     gpu_id: int,
     world_size: int,
     args_dict: dict,
-    chunk: List[dict],
+    chunk: list[dict],
 ):
     """Runs on one GPU. Loads model, iterates over `chunk`, writes one JSONL."""
     # Bind CUDA before importing torch to keep the child pinned to one card.
@@ -311,14 +311,14 @@ def worker_main(
     # ------------------------------------------------------------------
     # Task routing (aligned with the vLLM client):
     #   --task-type SET   → override every row's prompt with the official
-    #                       TASK_PROMPTS[task_type]; doc_pp iff task_type
+    #                       TASK_PROMPTS[task_type]; normalize_doc_parse_markdown iff task_type
     #                       == "doc_parse".
     #   --task-type UNSET → per-row prompt from JSONL[prompt_key] (fallback
-    #                       to --prompt); doc_pp only when the actual prompt
+    #                       to --prompt); normalize_doc_parse_markdown only when the actual prompt
     #                       matches the official doc_parse wording (avoids
     #                       corrupting non-markdown outputs like spotting
     #                       JSON, formula LaTeX, table HTML — see
-    #                       hunyuan_utils.py header comment).
+    #                       output_utils.py header comment).
     # ------------------------------------------------------------------
     forced_prompt = None
     force_doc_pp_gate = None  # None → decide per-sample; True/False → fixed
@@ -327,17 +327,12 @@ def worker_main(
         force_doc_pp_gate = a.task_type == "doc_parse"
     doc_parse_prompt = TASK_PROMPTS["doc_parse"]
 
-    doc_pp = None
-    if not a.no_doc_postprocess:
-        try:
-            sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
-            from utils.hunyuan_utils import process_one as doc_pp
-        except Exception as e:
-            print(f"[GPU {gpu_id}] doc_postprocess unavailable ({e}); skipping.", file=sys.stderr, flush=True)
-            doc_pp = None
-    if force_doc_pp_gate is False:
-        # Explicitly asked for a non-doc_parse task → disable normalization.
-        doc_pp = None
+    # doc_parse markdown normalization gate:
+    #   - --no-doc-postprocess          → disabled
+    #   - --task-type is doc_parse      → always on
+    #   - --task-type is non-doc_parse  → always off
+    #   - --task-type unset             → decide per-sample by matching the prompt
+    doc_pp_enabled = (not a.no_doc_postprocess) and (force_doc_pp_gate is not False)
 
     output_path = f"{a.output}_{gpu_id + 1}.jsonl"
 
@@ -405,12 +400,12 @@ def worker_main(
                         min_repeats=a.repeat_min_repeats,
                     )
 
-                gen_kwargs = dict(
-                    max_new_tokens=a.max_new_tokens,
-                    do_sample=False,  # temperature=0 → greedy
-                    repetition_penalty=a.repetition_penalty,
-                    use_cache=True,
-                )
+                gen_kwargs = {
+                    "max_new_tokens": a.max_new_tokens,
+                    "do_sample": False,  # temperature=0 → greedy
+                    "repetition_penalty": a.repetition_penalty,
+                    "use_cache": True,
+                }
                 if eos_token_id is not None:
                     gen_kwargs["eos_token_id"] = eos_token_id
                 if pad_token_id is not None:
@@ -429,27 +424,22 @@ def worker_main(
                 )
                 out_text = decoded[0] if decoded else ""
                 out_text = clean_repeated_substrings(out_text)
-                # doc_parse markdown 规整 (对齐 vLLM client, 与 hunyuan_utils.process_one 同源).
-                # 默认开; --no-doc-postprocess 关闭。仅在当前样本是 doc_parse 任务时生效——
-                # --task-type 显式指定时直接看 force_doc_pp_gate, 否则通过 prompt 精确匹配
-                # 官方 doc_parse wording, 避免污染 spotting / formula / table 等非 markdown
-                # 输出 (见 inference/utils/hunyuan_utils.py 顶部 comment)。
-                if doc_pp is not None:
-                    apply_pp = (
-                        force_doc_pp_gate is True if force_doc_pp_gate is not None else prompt == doc_parse_prompt
-                    )
-                    if apply_pp:
-                        try:
-                            out_text, _ = doc_pp(out_text)
-                        except Exception:
-                            pass
+                # doc_parse markdown 规整（与 vLLM client 同源）：只在 doc_parse
+                # 样本上生效；--task-type 未指定时通过 prompt 精确匹配官方
+                # doc_parse wording，避免污染 spotting / formula / table 等非
+                # markdown 输出（见 inference/utils/output_utils.py 顶部注释）。
+                if doc_pp_enabled and (force_doc_pp_gate is True or prompt == doc_parse_prompt):
+                    try:
+                        out_text, _ = normalize_doc_parse_markdown(out_text)
+                    except Exception:  # noqa: S110
+                        pass
                 data[a.answer_key] = out_text
 
                 fout.write(json.dumps(data, ensure_ascii=False) + "\n")
                 fout.flush()
 
             except Exception as e:
-                err = f"ERROR: {type(e).__name__}: {str(e)}"
+                err = f"ERROR: {type(e).__name__}: {e!s}"
                 print(f"[GPU {gpu_id}] {err}", flush=True)
                 data[a.answer_key] = err
                 fout.write(json.dumps(data, ensure_ascii=False) + "\n")
@@ -502,7 +492,7 @@ def parse_args():
         choices=list(TASK_PROMPTS.keys()),
         help=(
             "force ALL rows to use the official prompt of this task (from "
-            "inference/utils/hunyuan_tasks.py); this also gates doc_parse markdown "
+            "inference/utils/tasks.py); this also gates doc_parse markdown "
             "normalization (only enabled for task_type='doc_parse'). "
             "If unset (default), the per-row --prompt-key field is used (falling "
             "back to --prompt), preserving the legacy JSONL-driven workflow."
@@ -544,7 +534,7 @@ def parse_args():
     p.add_argument(
         "--no-doc-postprocess",
         action="store_true",
-        help="disable doc_parse markdown normalization (hunyuan_utils.process_one). "
+        help="disable doc_parse markdown normalization (output_utils.normalize_doc_parse_markdown). "
         "Default: enabled, to match the vLLM client output convention.",
     )
 

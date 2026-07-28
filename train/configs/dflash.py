@@ -1,21 +1,23 @@
-from typing import Optional, Callable
-from typing_extensions import Unpack, Tuple
+from collections.abc import Callable
+
 import torch
 from torch import nn
+from transformers.cache_utils import Cache
+from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.qwen3.modeling_qwen3 import (
+    ALL_ATTENTION_FUNCTIONS,
+    FlashAttentionKwargs,
+    GradientCheckpointingLayer,
+    Qwen3Config,
+    Qwen3MLP,
+    Qwen3PreTrainedModel,
     Qwen3RMSNorm,
     Qwen3RotaryEmbedding,
-    Qwen3Config,
-    Qwen3PreTrainedModel,
-    Qwen3MLP,
-    GradientCheckpointingLayer,
-    FlashAttentionKwargs,
-    rotate_half,
     eager_attention_forward,
-    ALL_ATTENTION_FUNCTIONS,
+    rotate_half,
 )
-from transformers.modeling_outputs import CausalLMOutputWithPast
-from transformers.cache_utils import Cache
+from typing_extensions import Unpack
+
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     cos = cos.unsqueeze(unsqueeze_dim)
@@ -58,11 +60,11 @@ class Qwen3DFlashAttention(nn.Module):
         hidden_states: torch.Tensor,
         target_hidden: torch.Tensor,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        attention_mask: Optional[torch.Tensor],
-        past_key_values: Optional[Cache] = None,
-        cache_position: Optional[torch.LongTensor] = None,
+        attention_mask: torch.Tensor | None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         bsz, q_len = hidden_states.shape[:-1]
         ctx_len = target_hidden.shape[1]
         q = self.q_proj(hidden_states)
@@ -110,17 +112,17 @@ class Qwen3DFlashDecoderLayer(GradientCheckpointingLayer):
 
     def forward(
         self,
-        target_hidden: Optional[torch.Tensor] = None,
-        hidden_states: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Cache] = None,
-        output_attentions: Optional[bool] = False,
-        use_cache: Optional[bool] = False,
-        cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        target_hidden: torch.Tensor | None = None,
+        hidden_states: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_value: Cache | None = None,
+        output_attentions: bool | None = False,
+        use_cache: bool | None = False,
+        cache_position: torch.LongTensor | None = None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    ) -> tuple[torch.FloatTensor, tuple[torch.FloatTensor, torch.FloatTensor] | None]:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         hidden_states = self.self_attn(
@@ -164,10 +166,10 @@ class DFlashDraftModel(Qwen3PreTrainedModel):
     def forward(
         self,
         position_ids: torch.LongTensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        noise_embedding: Optional[torch.Tensor] = None,
-        target_hidden: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Cache] = None,
+        attention_mask: torch.Tensor | None = None,
+        noise_embedding: torch.Tensor | None = None,
+        target_hidden: torch.Tensor | None = None,
+        past_key_values: Cache | None = None,
         use_cache: bool = False,
         **kwargs,
     ) -> CausalLMOutputWithPast:

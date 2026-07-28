@@ -142,6 +142,6 @@ inference/vLLM/
 └── batch_infer.py          # 批量推理（多端点并发）
 ```
 
-> 共享工具函数（`hunyuan_tasks.py`：task_type → 官方 prompt 映射；`hunyuan_utils.py`：流式早停 / 清洗 + doc_parse markdown 规整）单份放在 `inference/utils/`，被所有推理入口（`inference/vLLM/`、`inference/DFlash/`、`inference/transformers/`）导入。
+> 共享工具函数（`tasks.py`：task_type → 官方 prompt 映射；`output_utils.py`：流式早停 / 清洗 + doc_parse markdown 规整）单份放在 `inference/utils/`，被所有推理入口（`inference/vLLM/`、`inference/DFlash/`、`inference/transformers/`）导入。
 
 > 图片分辨率使用模型默认（`max_pixels ≈ 4096×4096`），无需配置。`config.json` 里的 `vision_config.max_image_size` 是位置编码表形状（模型结构参数），**不要**把它当作分辨率旋钮。

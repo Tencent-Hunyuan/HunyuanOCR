@@ -19,7 +19,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from typing import Callable, Optional, Union
+from collections.abc import Callable
 
 import torch
 from torch import nn
@@ -37,7 +37,11 @@ from ...processing_utils import Unpack
 from ...utils import TransformersKwargs, auto_docstring, can_return_tuple
 from ...utils.deprecation import deprecate_kwarg
 from ...utils.generic import is_flash_attention_requested, merge_with_config_defaults
-from .configuration_hunyuan_vl import HunYuanVLConfig, HunYuanVLTextConfig, HunYuanVLVisionConfig
+from .configuration_hunyuan_vl import (
+    HunYuanVLConfig,
+    HunYuanVLTextConfig,
+    HunYuanVLVisionConfig,
+)
 
 
 class HunYuanVLVisionMLP(nn.Module):
@@ -123,7 +127,7 @@ class HunYuanVLVisionPatchEmbed(nn.Module):
         self.patch_pos_embed = None
 
     def forward(self, pixel_values: torch.Tensor, grid_thw: list[list[int]]) -> torch.Tensor:
-        num_patches, hidden_size = pixel_values.shape
+        num_patches, _hidden_size = pixel_values.shape
         pixel_values = pixel_values.reshape(num_patches, self.num_channels, self.patch_size, self.patch_size)
 
         patch_embeds = self.patch_embedding(pixel_values)
@@ -223,7 +227,7 @@ def eager_attention_forward(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
-    attention_mask: Optional[torch.Tensor],
+    attention_mask: torch.Tensor | None,
     scaling: float,
     dropout: float = 0.0,
     **kwargs: Unpack[TransformersKwargs],
@@ -261,13 +265,13 @@ class HunYuanVLVisionAttention(nn.Module):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        position_embeddings: tuple[torch.Tensor, torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Cache] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        cu_seqlens: Optional[torch.Tensor] = None,
-        max_seqlen: Optional[int] = None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,
+        position_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
+        cu_seqlens: torch.Tensor | None = None,
+        max_seqlen: int | None = None,
         **kwargs,
     ) -> tuple[torch.Tensor, None]:
         input_shape = hidden_states.shape[:-1]
@@ -342,14 +346,14 @@ class HunYuanVLVisionBlock(GradientCheckpointingLayer):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        use_cache: Optional[bool] = False,
-        cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,
-        cu_seqlens: Optional[torch.Tensor] = None,
-        max_seqlen: Optional[int] = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        use_cache: bool | None = False,
+        cache_position: torch.LongTensor | None = None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,
+        cu_seqlens: torch.Tensor | None = None,
+        max_seqlen: int | None = None,
         **kwargs,
     ) -> torch.Tensor:
         residual = hidden_states
@@ -407,7 +411,6 @@ class HunYuanVLVisionTransformer(nn.Module):
         x: torch.Tensor,
         grid_thw: list[list[int]],
     ) -> torch.Tensor:
-        #
         r"""
         grid_thw (`torch.LongTensor` of shape `(num_images, 3)`):
             The temporal, height and width dimensions of feature shape for each image. Each row contains [t, h, w] values.
@@ -436,7 +439,7 @@ class HunYuanVLVisionTransformer(nn.Module):
 
         processed_items = []
         for grid, item in zip(grid_thw, split_items):
-            t, h, w = grid
+            _t, h, w = grid
             processed = self.perceive(item, size=(h, w))
             processed_items.append(processed)
 
@@ -497,9 +500,9 @@ class HunYuanVLRotaryEmbedding(nn.Module):
     def forward(
         self,
         x,
-        seq_len: Optional[int] = None,
-        position_ids: Optional[torch.Tensor] = None,
-        xdrope_section: Optional[list[int]] = None,
+        seq_len: int | None = None,
+        position_ids: torch.Tensor | None = None,
+        xdrope_section: list[int] | None = None,
     ):
         # x: [bs, num_attention_heads, seq_len, head_size]
         if position_ids is not None and position_ids.dim() >= 3 and xdrope_section is not None:
@@ -583,7 +586,7 @@ def apply_rotary_pos_emb(
     k: torch.Tensor,
     cos: torch.Tensor,
     sin: torch.Tensor,
-    position_ids: Optional[torch.Tensor] = None,
+    position_ids: torch.Tensor | None = None,
     unsqueeze_dim: int = 1,
 ):
     """Applies Rotary Position Embedding to the query and key tensors.
@@ -658,10 +661,10 @@ class HunYuanVLAttention(nn.Module):
         self,
         hidden_states: torch.Tensor,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        position_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Cache] = None,
-        cache_position: Optional[torch.LongTensor] = None,
+        position_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> tuple[torch.Tensor, torch.Tensor]:
         input_shape = hidden_states.shape[:-1]
@@ -730,7 +733,7 @@ class HunYuanVLAttention(nn.Module):
 
 
 class HunYuanVLDecoderLayer(GradientCheckpointingLayer):
-    def __init__(self, config: Union[HunYuanVLVisionConfig, HunYuanVLTextConfig], layer_idx: int):
+    def __init__(self, config: HunYuanVLVisionConfig | HunYuanVLTextConfig, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
 
@@ -753,12 +756,12 @@ class HunYuanVLDecoderLayer(GradientCheckpointingLayer):
     def forward(
         self,
         hidden_states: torch.Tensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        use_cache: Optional[bool] = False,
-        cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        use_cache: bool | None = False,
+        cache_position: torch.LongTensor | None = None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,  # necessary, but kept here for BC
         **kwargs: Unpack[TransformersKwargs],
     ) -> torch.Tensor:
         residual = hidden_states
@@ -842,7 +845,7 @@ class HunYuanVLPreTrainedModel(PreTrainedModel):
 
 @auto_docstring
 class HunYuanVLModel(HunYuanVLPreTrainedModel):
-    def __init__(self, config: Union[HunYuanVLConfig, HunYuanVLTextConfig]):
+    def __init__(self, config: HunYuanVLConfig | HunYuanVLTextConfig):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -858,14 +861,14 @@ class HunYuanVLModel(HunYuanVLPreTrainedModel):
     # @auto_docstring # TODO Fix this
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
+        input_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        inputs_embeds: torch.FloatTensor | None = None,
+        cache_position: torch.LongTensor | None = None,
+        use_cache: bool | None = None,
+        output_hidden_states: bool | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> BaseModelOutputWithPast:
         if (input_ids is None) ^ (inputs_embeds is not None):
@@ -941,15 +944,15 @@ class HunYuanVLForCausalLM(HunYuanVLPreTrainedModel, GenerationMixin):
     @auto_docstring
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        logits_to_keep: Union[int, torch.Tensor] = 0,
+        input_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        inputs_embeds: torch.FloatTensor | None = None,
+        labels: torch.LongTensor | None = None,
+        use_cache: bool | None = None,
+        cache_position: torch.LongTensor | None = None,
+        logits_to_keep: int | torch.Tensor = 0,
         **kwargs: Unpack[TransformersKwargs],
     ) -> CausalLMOutputWithPast:
         r"""
@@ -1025,17 +1028,17 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
     @auto_docstring
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        logits_to_keep: Union[int, torch.Tensor] = 0,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[torch.LongTensor] = None,
+        input_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        inputs_embeds: torch.FloatTensor | None = None,
+        labels: torch.LongTensor | None = None,
+        use_cache: bool | None = None,
+        cache_position: torch.LongTensor | None = None,
+        logits_to_keep: int | torch.Tensor = 0,
+        pixel_values: torch.FloatTensor | None = None,
+        image_grid_thw: torch.LongTensor | None = None,
         **kwargs: Unpack[TransformersKwargs],
     ) -> CausalLMOutputWithPast:
         r"""
@@ -1148,7 +1151,7 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
             attentions=outputs.attentions,
         )
 
-    def get_image_features(self, pixel_values: torch.FloatTensor, image_grid_thw: Optional[torch.LongTensor] = None):
+    def get_image_features(self, pixel_values: torch.FloatTensor, image_grid_thw: torch.LongTensor | None = None):
         """
         Encodes images into continuous embeddings that can be forwarded to the language model.
         """
@@ -1159,7 +1162,7 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
     def get_video_features(
         self,
         pixel_values_videos: torch.FloatTensor,
-        video_grid_thw: Optional[torch.LongTensor] = None,
+        video_grid_thw: torch.LongTensor | None = None,
     ):
         """
         Encodes videos into continuous embeddings that can be forwarded to the language model.
@@ -1217,16 +1220,16 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
     @torch.no_grad()
     def generate(
         self,
-        input_ids: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        imgs: Optional[list[torch.FloatTensor]] = None,
-        imgs_pos: Optional[list[int]] = None,
-        token_type_ids: Optional[torch.LongTensor] = None,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[list[int]] = None,
-        pixel_values_videos: Optional[torch.FloatTensor] = None,
-        video_grid_thw: Optional[torch.LongTensor] = None,
+        input_ids: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        imgs: list[torch.FloatTensor] | None = None,
+        imgs_pos: list[int] | None = None,
+        token_type_ids: torch.LongTensor | None = None,
+        pixel_values: torch.FloatTensor | None = None,
+        image_grid_thw: list[int] | None = None,
+        pixel_values_videos: torch.FloatTensor | None = None,
+        video_grid_thw: torch.LongTensor | None = None,
         **kwargs,
     ) -> CausalLMOutputWithPast:
         if "inputs_embeds" in kwargs:
@@ -1276,8 +1279,8 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
         self,
         input_ids: torch.LongTensor,
         inputs_embeds: torch.FloatTensor,
-        image_features: Optional[torch.FloatTensor] = None,
-        token_id: Optional[int] = None,
+        image_features: torch.FloatTensor | None = None,
+        token_id: int | None = None,
     ):
         """
         Obtains multimodal placeholder mask from `input_ids` or `inputs_embeds`, and checks that the placeholder token count is
@@ -1306,9 +1309,8 @@ class HunYuanVLForConditionalGeneration(HunYuanVLPreTrainedModel, GenerationMixi
 
 
 __all__ = [
-    "HunYuanVLForConditionalGeneration",
     "HunYuanVLForCausalLM",
+    "HunYuanVLForConditionalGeneration",
     "HunYuanVLModel",
     "HunYuanVLPreTrainedModel",
-    "HunYuanVLTextModel",
 ]

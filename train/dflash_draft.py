@@ -1,13 +1,25 @@
-from typing import Optional, Callable, Union
-from typing_extensions import Unpack, Tuple
+"""
+dflash_draft.py — DFlash draft model definition (from-scratch training).
+
+Defines ``MYDraft`` and its supporting ``DFlashDraftModel``. ``__init__``
+copies weights from the last K layers of the target base model, so the draft
+starts warm without needing an external checkpoint. Use this for training a
+draft from scratch on large SFT data.
+
+To continue-finetune from an existing DFlash checkpoint, see the sibling
+module ``dflash_draft_resume.py`` (``MYDraftFromDFlash``).
+"""
+
+from collections.abc import Callable
+
 import torch
-from torch import nn
 import torch.nn.functional as F
-import copy
+from torch import nn
+from typing_extensions import Unpack
 
 # FlexAttention imports
 try:
-    from torch.nn.attention.flex_attention import flex_attention, create_block_mask
+    from torch.nn.attention.flex_attention import create_block_mask, flex_attention
     FLEX_ATTENTION_AVAILABLE = True
 except ImportError:
     FLEX_ATTENTION_AVAILABLE = False
@@ -16,6 +28,7 @@ except ImportError:
 
 # Import HunyuanVL components
 import sys
+
 # Add project root to Python path
 from pathlib import Path
 
@@ -24,24 +37,24 @@ sys.path.insert(0, str(project_root))
 
 
 
-from train.utils import build_target_layer_ids, extract_context_feature, sample
-
-from transformers import DynamicCache
-from transformers import AutoConfig
+from transformers import AutoConfig, DynamicCache
+from transformers.cache_utils import Cache
+from transformers.modeling_outputs import CausalLMOutputWithPast
 from transformers.models.qwen3.modeling_qwen3 import (
+    ALL_ATTENTION_FUNCTIONS,
+    FlashAttentionKwargs,
+    GradientCheckpointingLayer,
+    Qwen3Config,
+    Qwen3MLP,
+    Qwen3PreTrainedModel,
     Qwen3RMSNorm,
     Qwen3RotaryEmbedding,
-    Qwen3Config,
-    Qwen3PreTrainedModel,
-    Qwen3MLP,
-    GradientCheckpointingLayer,
-    FlashAttentionKwargs,
-    rotate_half,
     eager_attention_forward,
-    ALL_ATTENTION_FUNCTIONS,
+    rotate_half,
 )
-from transformers.modeling_outputs import CausalLMOutputWithPast
-from transformers.cache_utils import Cache
+
+from train.dflash_utils import extract_context_feature, sample
+
 
 def apply_rotary_pos_emb(q, k, cos, sin, position_ids=None, unsqueeze_dim=1):
     cos = cos.unsqueeze(unsqueeze_dim)
@@ -86,11 +99,11 @@ class Qwen3DFlashAttention(nn.Module):
         hidden_states: torch.Tensor,
         target_hidden: torch.Tensor,
         position_embeddings: tuple[torch.Tensor, torch.Tensor],
-        attention_mask: Optional[torch.Tensor],
-        past_key_values: Optional[Cache] = None,
-        cache_position: Optional[torch.LongTensor] = None,
+        attention_mask: torch.Tensor | None,
+        past_key_values: Cache | None = None,
+        cache_position: torch.LongTensor | None = None,
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> tuple[torch.Tensor, Optional[torch.Tensor]]:
+    ) -> tuple[torch.Tensor, torch.Tensor | None]:
         bsz, q_len = hidden_states.shape[:-1]
         ctx_len = target_hidden.shape[1]
         q = self.q_proj(hidden_states)
@@ -146,17 +159,17 @@ class Qwen3DFlashDecoderLayer(GradientCheckpointingLayer):
 
     def forward(
         self,
-        target_hidden: Optional[torch.Tensor] = None,
-        hidden_states: Optional[torch.Tensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_value: Optional[Cache] = None,
-        output_attentions: Optional[bool] = False,
-        use_cache: Optional[bool] = False,
-        cache_position: Optional[torch.LongTensor] = None,
-        position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # necessary, but kept here for BC
+        target_hidden: torch.Tensor | None = None,
+        hidden_states: torch.Tensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_value: Cache | None = None,
+        output_attentions: bool | None = False,
+        use_cache: bool | None = False,
+        cache_position: torch.LongTensor | None = None,
+        position_embeddings: tuple[torch.Tensor, torch.Tensor] | None = None,  # necessary, but kept here for BC
         **kwargs: Unpack[FlashAttentionKwargs],
-    ) -> Tuple[torch.FloatTensor, Optional[Tuple[torch.FloatTensor, torch.FloatTensor]]]:
+    ) -> tuple[torch.FloatTensor, tuple[torch.FloatTensor, torch.FloatTensor] | None]:
         residual = hidden_states
         hidden_states = self.input_layernorm(hidden_states)
         hidden_states = self.self_attn(
@@ -200,10 +213,10 @@ class DFlashDraftModel(Qwen3PreTrainedModel):
     def forward(
         self,
         position_ids: torch.LongTensor,
-        attention_mask: Optional[torch.Tensor] = None,
-        noise_embedding: Optional[torch.Tensor] = None,
-        target_hidden: Optional[torch.Tensor] = None,
-        past_key_values: Optional[Cache] = None,
+        attention_mask: torch.Tensor | None = None,
+        noise_embedding: torch.Tensor | None = None,
+        target_hidden: torch.Tensor | None = None,
+        past_key_values: Cache | None = None,
         use_cache: bool = False,
         **kwargs,
     ) -> CausalLMOutputWithPast:
@@ -226,21 +239,21 @@ class DFlashDraftModel(Qwen3PreTrainedModel):
     @torch.inference_mode()
     def generate_with_mtp_speculative(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        logits_to_keep: Union[int, torch.Tensor] = 0,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[list[int]] = None,
+        input_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        inputs_embeds: torch.FloatTensor | None = None,
+        labels: torch.LongTensor | None = None,
+        use_cache: bool | None = None,
+        output_hidden_states: bool | None = None,
+        cache_position: torch.LongTensor | None = None,
+        logits_to_keep: int | torch.Tensor = 0,
+        pixel_values: torch.FloatTensor | None = None,
+        image_grid_thw: list[int] | None = None,
         target: nn.Module = None,
         max_new_tokens: int = 1024,
-        eos_token_id: Optional[int] = None,
+        eos_token_id: int | None = None,
         temperature: float = 0.0,
         **kwargs,
     ):
@@ -507,7 +520,7 @@ class MYDraft(Qwen3PreTrainedModel):
         
         # Copy final norm from target model
         self.draft_model.norm.load_state_dict(self.target_model.model.norm.state_dict())
-        print(f"Initialized draft_model.norm from target_model.model.norm")
+        print("Initialized draft_model.norm from target_model.model.norm")
 
 
     # ------------------------------------------------------------------
@@ -836,18 +849,18 @@ class MYDraft(Qwen3PreTrainedModel):
 
     def forward(
         self,
-        input_ids: Optional[torch.LongTensor] = None,
-        attention_mask: Optional[torch.Tensor] = None,
-        position_ids: Optional[torch.LongTensor] = None,
-        past_key_values: Optional[Cache] = None,
-        inputs_embeds: Optional[torch.FloatTensor] = None,
-        labels: Optional[torch.LongTensor] = None,
-        use_cache: Optional[bool] = None,
-        output_hidden_states: Optional[bool] = None,
-        cache_position: Optional[torch.LongTensor] = None,
-        logits_to_keep: Union[int, torch.Tensor] = 0,
-        pixel_values: Optional[torch.FloatTensor] = None,
-        image_grid_thw: Optional[list[int]] = None,
+        input_ids: torch.LongTensor | None = None,
+        attention_mask: torch.Tensor | None = None,
+        position_ids: torch.LongTensor | None = None,
+        past_key_values: Cache | None = None,
+        inputs_embeds: torch.FloatTensor | None = None,
+        labels: torch.LongTensor | None = None,
+        use_cache: bool | None = None,
+        output_hidden_states: bool | None = None,
+        cache_position: torch.LongTensor | None = None,
+        logits_to_keep: int | torch.Tensor = 0,
+        pixel_values: torch.FloatTensor | None = None,
+        image_grid_thw: list[int] | None = None,
         **kwargs,
     ) -> CausalLMOutputWithPast:
         # target_model must run in eval mode regardless of trainer state.
@@ -877,10 +890,10 @@ class MYDraft(Qwen3PreTrainedModel):
             mtp_input_ids,
             context_position_ids,
             mtp_position_ids,
-            mtp_attention_mask,
+            _mtp_attention_mask,
             mask_labels,
             block_mask,
-            label_global_indices,
+            _label_global_indices,
             weight_mask,
         ) = self._build_mtp_inputs(
             input_ids=input_ids,

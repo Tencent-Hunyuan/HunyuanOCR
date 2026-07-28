@@ -1,19 +1,22 @@
-from typing import Optional
 
 import torch
 from flash_attn.flash_attn_interface import flash_attn_varlen_func
 from transformers import Trainer
 from transformers.cache_utils import Cache
-from transformers.utils.deprecation import deprecate_kwarg
 from transformers.processing_utils import Unpack
-from transformers.utils import logging, TransformersKwargs
+from transformers.utils import TransformersKwargs, logging
+from transformers.utils.deprecation import deprecate_kwarg
 
 logger = logging.get_logger(__name__)
 
 
-from transformers.models.hunyuan_vl.modeling_hunyuan_vl import apply_rotary_pos_emb_xdrope, apply_rotary_pos_emb, HunYuanVLVisionTransformer, HunYuanVLModel
-
 import transformers
+from transformers.models.hunyuan_vl.modeling_hunyuan_vl import (
+    HunYuanVLModel,
+    HunYuanVLVisionTransformer,
+    apply_rotary_pos_emb,
+    apply_rotary_pos_emb_xdrope,
+)
 
 
 def flash_attention_forward(
@@ -21,11 +24,11 @@ def flash_attention_forward(
     query: torch.Tensor,
     key: torch.Tensor,
     value: torch.Tensor,
-    attention_mask: Optional[torch.Tensor],
+    attention_mask: torch.Tensor | None,
     dropout: float = 0.0,
-    scaling: Optional[float] = None,
-    sliding_window: Optional[int] = None,
-    softcap: Optional[float] = None,
+    scaling: float | None = None,
+    sliding_window: int | None = None,
+    softcap: float | None = None,
     **kwargs,
 ) -> tuple[torch.Tensor, None]:
     if kwargs.get("output_attentions", False) or kwargs.get("head_mask") is not None:
@@ -35,7 +38,7 @@ def flash_attention_forward(
         )
     
     # This is before the transpose
-    seq_len = query.shape[2]
+    query.shape[2]
 
     if any(dim == 0 for dim in query.shape):
         raise ValueError(
@@ -55,15 +58,17 @@ def flash_attention_forward(
     # cast them back in the correct dtype just to be sure everything works as expected.
     # This might slowdown training & inference so it is recommended to not cast the LayerNorms
     # in fp32. (usually our RMSNorm modules handle it correctly)
-    target_dtype = None
     if query.dtype == torch.float32:
         if torch.is_autocast_enabled():
-            target_dtype = torch.get_autocast_gpu_dtype()
+            torch.get_autocast_gpu_dtype()
         # Handle the case where the model is quantized
         elif hasattr(module.config, "_pre_quantization_dtype"):
-            target_dtype = module.config._pre_quantization_dtype
+            pass
         else:
-            target_dtype = next(layer for layer in module.modules() if isinstance(layer, torch.nn.Linear)).weight.dtype
+            # Access .weight.dtype to trigger lazy load / dtype resolution.
+            # Kept as an expression-statement to mirror upstream HuggingFace
+            # FlashAttention integrations (LlamaFlashAttention2 et al.).
+            next(layer for layer in module.modules() if isinstance(layer, torch.nn.Linear)).weight.dtype  # noqa: B018
 
     query = query.squeeze(0)
     key = key.squeeze(0)
@@ -99,10 +104,10 @@ def hunyuanvl_forward(
     self,
     hidden_states: torch.Tensor,
     position_embeddings: tuple[torch.Tensor, torch.Tensor],
-    position_ids: Optional[torch.LongTensor] = None,
-    attention_mask: Optional[torch.Tensor] = None,
-    past_key_values: Optional[Cache] = None,
-    cache_position: Optional[torch.LongTensor] = None,
+    position_ids: torch.LongTensor | None = None,
+    attention_mask: torch.Tensor | None = None,
+    past_key_values: Cache | None = None,
+    cache_position: torch.LongTensor | None = None,
     **kwargs: Unpack[TransformersKwargs],
 ) -> tuple[torch.Tensor, torch.Tensor]:
     input_shape = hidden_states.shape[:-1]

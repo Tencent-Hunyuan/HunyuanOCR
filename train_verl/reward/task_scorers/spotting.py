@@ -17,7 +17,7 @@ from __future__ import annotations
 import json
 import re
 
-from ._shared import levenshtein_distance, normalize_text, snap_to_nearest_integer
+from .text_metrics import levenshtein_distance, normalize_text, snap_to_nearest_integer
 
 _SPOTTING_FORMATS = ("format1", "format2", "format3", "format_json")
 
@@ -45,7 +45,7 @@ def _detect_spotting_format(text: str) -> str:
             obj = json.loads(stripped)
             if isinstance(obj, list) and obj and isinstance(obj[0], dict) and ("box" in obj[0] or "bbox" in obj[0]):
                 return "format_json"
-        except Exception:
+        except Exception:  # noqa: S110
             pass
 
     if "<ref>" in text and "<quad>(" in text:
@@ -268,55 +268,55 @@ def _compare_spotting_results_soft(boxes1, boxes2, iou_threshold: float = 0.5) -
 # ---------------------------------------------------------------------------
 
 
-def process_spotting_task(response_a: str, response_b: str) -> dict:
+def process_spotting_task(response: str, ref_answer: str) -> dict:
     """Score a spotting task locally.
 
     Args:
-        response_a: rollout response (prediction).
-        response_b: reference answer.
+        response: rollout response (prediction).
+        ref_answer: reference answer.
 
     Returns:
         ``{"analysis", "is_valid", "reward"}`` dict.
     """
     # <answer>...</answer> unwrap, used by some prompt templates.
-    if "<answer>" in response_a and "</answer>" in response_a:
-        response_a = re.findall(r"<answer>(.+?)</answer>", response_a, flags=re.DOTALL)[0].strip()
-    if "<answer>" in response_b and "</answer>" in response_b:
-        response_b = re.findall(r"<answer>(.+?)</answer>", response_b, flags=re.DOTALL)[0].strip()
+    if "<answer>" in response and "</answer>" in response:
+        response = re.findall(r"<answer>(.+?)</answer>", response, flags=re.DOTALL)[0].strip()
+    if "<answer>" in ref_answer and "</answer>" in ref_answer:
+        ref_answer = re.findall(r"<answer>(.+?)</answer>", ref_answer, flags=re.DOTALL)[0].strip()
 
-    resp1 = response_a.strip().replace(".", "").replace("。", "")
-    resp2 = response_b.strip().replace(".", "").replace("。", "")
-    if resp1 == resp2 or ("没有文字" in resp1 and resp2 == "") or ("没有文字" in resp1 and "没有文字" in resp2):
+    resp_norm = response.strip().replace(".", "").replace("。", "")
+    ref_norm = ref_answer.strip().replace(".", "").replace("。", "")
+    if resp_norm == ref_norm or ("没有文字" in resp_norm and ref_norm == "") or ("没有文字" in resp_norm and "没有文字" in ref_norm):
         return {"analysis": "Responses are identical.", "is_valid": True, "reward": 1.0}
 
-    format_a = _detect_spotting_format(response_a)
-    format_b = _detect_spotting_format(response_b)
+    resp_format = _detect_spotting_format(response)
+    ref_format = _detect_spotting_format(ref_answer)
 
     try:
-        if format_a in _SPOTTING_FORMATS:
-            boxes_a = _parse_by_format(response_a, format_a)
+        if resp_format in _SPOTTING_FORMATS:
+            boxes_pred = _parse_by_format(response, resp_format)
         else:
-            if "没有文字" in response_a or "无文字" in response_a or "no text" in response_a.lower():
+            if "没有文字" in response or "无文字" in response or "no text" in response.lower():
                 return {"analysis": "No text detected in response.", "is_valid": True, "reward": 0}
             return {
-                "analysis": f"Unknown format for response: {format_a}, reward set to 0",
+                "analysis": f"Unknown format for response: {resp_format}, reward set to 0",
                 "is_valid": False,
                 "reward": 0,
             }
 
-        if format_b in _SPOTTING_FORMATS:
-            boxes_b = _parse_by_format(response_b, format_b)
+        if ref_format in _SPOTTING_FORMATS:
+            boxes_ref = _parse_by_format(ref_answer, ref_format)
         else:
-            return {"analysis": f"Unknown format for ref answer: {format_b}", "is_valid": False, "reward": -1.0}
+            return {"analysis": f"Unknown format for ref answer: {ref_format}", "is_valid": False, "reward": -1.0}
 
-        if not boxes_a or not boxes_b:
+        if not boxes_pred or not boxes_ref:
             return {
-                "analysis": f"Failed to parse boxes: A({len(boxes_a)}) B({len(boxes_b)})",
+                "analysis": f"Failed to parse boxes: pred({len(boxes_pred)}) ref({len(boxes_ref)})",
                 "decision": "Answers are not identical.",
             }
 
-        is_valid, reward, reason = _compare_spotting_results_soft(boxes_a, boxes_b)
-        reason += f"; pred format: {format_a}, ref format: {format_b}"
+        is_valid, reward, reason = _compare_spotting_results_soft(boxes_pred, boxes_ref)
+        reason += f"; pred format: {resp_format}, ref format: {ref_format}"
         return {"analysis": reason, "is_valid": is_valid, "reward": reward}
 
     except Exception as e:

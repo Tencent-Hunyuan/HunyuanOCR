@@ -46,10 +46,8 @@ server_manager = ServerManager()
 
 
 class OCRScorer:
-    def __init__(self, max_try=3, text_sim_threshold=0.99, temperature=0.2, top_p=0.95):
+    def __init__(self, max_try: int = 3, temperature: float = 0.2, top_p: float = 0.95):
         self.max_try = max_try
-        self.request_count = 0
-        self.text_sim_threshold = text_sim_threshold
         self.temperature = temperature
         self.top_p = top_p
         self.task_type_list = [task.value for task in TaskType]
@@ -58,7 +56,7 @@ class OCRScorer:
     # judge model plumbing
     # ------------------------------------------------------------------
 
-    def call_api_offline(self, img_path: str, question: str, system_prompt=None) -> str:
+    def call_api_offline(self, question: str, system_prompt=None) -> str:
         """Call the local OpenAI-compatible vLLM judge server (round-robin)."""
         server = server_manager.get_next_server(DEFAULT_JUDGE_MODEL_NAME)
         if server is None:
@@ -67,7 +65,6 @@ class OCRScorer:
         return request_vllm_server(
             server,
             question,
-            img_path,
             temperature=self.temperature,
             top_p=self.top_p,
             system_prompt=system_prompt,
@@ -75,9 +72,8 @@ class OCRScorer:
 
     def call_api(
         self,
-        img_path: str | None,
         question: str,
-        validate_func: Callable = None,
+        validate_func: Callable | None = None,
         type_check=None,
         system_prompt=None,
     ) -> tuple[str, str]:
@@ -85,7 +81,7 @@ class OCRScorer:
         raw_response = None
         for num_request in range(self.max_try):
             try:
-                raw_response = self.call_api_offline(img_path, question, system_prompt)
+                raw_response = self.call_api_offline(question, system_prompt)
                 if raw_response is not None:
                     if validate_func is not None:
                         validated_response = validate_func(raw_response, type_check)
@@ -176,7 +172,7 @@ class OCRScorer:
     # ------------------------------------------------------------------
 
     def process_scoring(self, obj: dict) -> str | None:
-        """Run rule-based / GenRM scoring; return a JSON string (or None if the
+        """Run rule-based / judge-based scoring; return a JSON string (or None if the
         task type is not supported)."""
         question = obj["prompt"]
         response, ref_answer = obj["response"], obj["ref_answer"]
@@ -246,7 +242,6 @@ class OCRScorer:
             full_prompt = full_prompt.replace("{reference}", target_lang)
 
             judge_response, judge_response_raw = self.call_api(
-                None,
                 full_prompt,
                 validate_func=self.validate_format_response,
                 type_check=TaskType.TRANSLATION.value,
@@ -288,7 +283,6 @@ class OCRScorer:
             full_prompt = full_prompt.replace("{gt}", ref_answer)
 
             judge_response, judge_response_raw = self.call_api(
-                None,
                 full_prompt,
                 validate_func=self.validate_format_response,
                 type_check=TaskType.VQA.value,

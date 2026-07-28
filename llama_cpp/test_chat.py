@@ -19,7 +19,7 @@ from chat import DOC_PARSE_PROMPT, chat, maybe_postprocess
 # ---------------- knobs ----------------
 IMAGE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "test_assets", "ocr")
 PROMPT = DOC_PARSE_PROMPT
-# doc_parse markdown normalization on the response (hunyuan_utils.process_one).
+# doc_parse markdown normalization on the response (output_utils.normalize_doc_parse_markdown).
 DO_DOC_POSTPROCESS = True
 # Cap number of images (None = all).
 MAX_IMAGES = None

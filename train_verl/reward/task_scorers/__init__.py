@@ -5,7 +5,7 @@ One entry point per rule-scored task; every entry returns a
 task-specific extra fields, kept as-is for downstream analytics).
 """
 
-from .chart_deplot.chart_deplot_utils import process_chart_deplot_task
+from .chart_deplot.utils import process_chart_deplot_task
 from .ie import process_ie_task
 from .layout import process_layout_task
 from .parsing import process_parsing_task

@@ -6,7 +6,7 @@ Differences from train_draft.py:
   * Adds a new CLI argument ``--dflash_init_dir`` (string, required) pointing
     to a directory containing ``config.json`` + ``model.safetensors`` of a
     previously-trained DFlash draft model.
-  * Uses MYDraftFromDFlash (from hunyuan_vl_dflash_v2) instead of MYDraft so
+  * Uses MYDraftFromDFlash (from dflash_draft_resume) instead of MYDraft so
     weights are loaded from that directory rather than copied from the last
     K layers of the (frozen) target model.
   * Everything else (target model loading, tokenizer, dataset, trainer, save
@@ -17,19 +17,21 @@ The original train_draft.py is left untouched.
 Usage::
 
     torchrun ... train/train_draft_from_dflash.py \
-        --model_name_or_path ./models/hunyuanocr_0619_300_local \
+        --model_name_or_path ./HunyuanOCR \
         --dflash_init_dir   /path/to/existing_dflash_ckpt_dir \
         --train_data_path   ./data/parsing_packed_20480.jsonl \
         ...
 """
 
-import os
 import logging
+import os
 import pathlib
 import sys
+
+logger = logging.getLogger(__name__)
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import torch
 import transformers
@@ -39,21 +41,21 @@ from torch import nn
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from train.trainer import replace_hunyuanocr_attention_class
-from train.data_processor import PackedVLDataCollator, VLDataset
-from train.argument import (
-    ModelArguments,
-    DataArguments,
-    TrainingArguments,
-    DraftArguments,
+from transformers import (
+    AutoProcessor,
+    AutoTokenizer,
+    HunYuanVLForConditionalGeneration,
+    Trainer,
 )
 
-from transformers import (
-    AutoTokenizer,
-    AutoProcessor,
-    Trainer,
-    HunYuanVLForConditionalGeneration,
+from train.argument import (
+    DataArguments,
+    DraftArguments,
+    ModelArguments,
+    TrainingArguments,
 )
+from train.data_processor import PackedVLDataCollator, VLDataset
+from train.trainer import replace_hunyuanocr_attention_class
 
 transformers.logging.set_verbosity_info()
 
@@ -72,7 +74,7 @@ class DFlashInitArguments:
       - config.json          (matching DFlashDraftModel structure)
       - model.safetensors    (or pytorch_model.bin)
     """
-    dflash_init_dir: Optional[str] = field(
+    dflash_init_dir: str | None = field(
         default=None,
         metadata={
             "help": "Directory containing a previously-trained DFlash draft "
@@ -98,9 +100,9 @@ class DraftOnlyTrainer(Trainer):
     def compute_loss(
         self,
         model: nn.Module,
-        inputs: dict[str, Union[torch.Tensor, Any]],
+        inputs: dict[str, torch.Tensor | Any],
         return_outputs: bool = False,
-        num_items_in_batch: Optional[torch.Tensor] = None,
+        num_items_in_batch: torch.Tensor | None = None,
     ):
         outputs = model(**inputs)
         loss_dict = outputs["loss"]
@@ -198,7 +200,7 @@ def train(attn_implementation: str = "flash_attention_2"):
     target_model.config.num_draft_layers = draft_args.num_draft_layers
 
     # ── Build MYDraft, initialized from external dflash checkpoint ────────
-    from train.hunyuan_vl_dflash_v2 import MYDraftFromDFlash
+    from train.dflash_draft_resume import MYDraftFromDFlash
 
     if dflash_init_args.dflash_init_dir is None:
         rank0_print(
@@ -280,7 +282,7 @@ def train(attn_implementation: str = "flash_attention_2"):
     )
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
-        logging.info("Checkpoint found, resuming training...")
+        logger.info("Checkpoint found, resuming training...")
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()

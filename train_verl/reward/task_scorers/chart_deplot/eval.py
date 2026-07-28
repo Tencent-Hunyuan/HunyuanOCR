@@ -93,9 +93,7 @@ def is_html_table(text: str) -> bool:
         return False
     if "<tr" not in text and "<TR" not in text:
         return False
-    if "<td" not in text and "<TD" not in text and "<th" not in text and "<TH" not in text:
-        return False
-    return True
+    return not ("<td" not in text and "<TD" not in text and "<th" not in text and "<TH" not in text)
 
 
 def html_table_to_csv(text: str) -> str:
@@ -129,7 +127,7 @@ def html_table_to_csv(text: str) -> str:
         def _skip_occupied(c: int) -> int:
             while c in pending and pending[c][0] > 0:
                 remaining, value = pending[c]
-                row[c] = value
+                row[c] = value  # noqa: B023  called synchronously within the current iteration; row does not escape
                 pending[c] = (remaining - 1, value)
                 if pending[c][0] <= 0:
                     del pending[c]
@@ -242,10 +240,8 @@ def is_pipe_table(text: str) -> bool:
         return False
 
     cc = Counter(col_counts)
-    top_cnt, top_n = cc.most_common(1)[0]
-    if top_n < max(2, int(len(col_counts) * 0.7)):
-        return False
-    return True
+    _top_cnt, top_n = cc.most_common(1)[0]
+    return not top_n < max(2, int(len(col_counts) * 0.7))
 
 
 def pipe_table_to_csv(text: str) -> str:
@@ -489,9 +485,7 @@ def _is_empty_header(header: list[str]) -> bool:
     """判断 header 是否为无表头表格。"""
     if all(h.strip() == "" for h in header):
         return True
-    if len(header) >= 2 and header[0].strip() != "" and all(h.strip() == "" for h in header[1:]):
-        return True
-    return False
+    return bool(len(header) >= 2 and header[0].strip() != "" and all(h.strip() == "" for h in header[1:]))
 
 
 def _csv2triples(
@@ -645,7 +639,7 @@ def _postprocess_extra_triples(
                 filtered_pred = [t for t in pred if not is_target_triple(t)]
                 msg = (
                     f"移除{pred_target_count}条{tag}三元组"
-                    f"({len(entity_target_counts)}个entity×{list(unique_counts)[0] if unique_counts else 0})"
+                    f"({len(entity_target_counts)}个entity×{next(iter(unique_counts)) if unique_counts else 0})"
                 )
                 logger.info(f"[样本 {idx}] {msg}")
                 if logs is not None:
@@ -753,7 +747,7 @@ def csv_eval(
 
                 pred_first_col_named = len(pred_header) > 0 and pred_header[0].strip() != ""
 
-                def _is_auto_index_column() -> bool:
+                def _is_auto_index_column(pred_rows=pred_rows, pred_header=pred_header) -> bool:
                     if len(pred_rows) < 2:
                         return False
                     if len(pred_header) == 0 or pred_header[0].strip() != "":
@@ -1623,16 +1617,16 @@ def flowchart_eval(
 
 
 __all__ = [
-    # 格式探测
-    "is_mermaid",
-    "is_markdown_list",
-    "is_markdown_table",
-    "is_html_table",
-    "is_pipe_table",
-    "is_csv_format",
-    "normalize_to_csv",
     # 评测
     "csv_eval",
-    "tree_eval",
     "flowchart_eval",
+    "is_csv_format",
+    "is_html_table",
+    "is_markdown_list",
+    "is_markdown_table",
+    # 格式探测
+    "is_mermaid",
+    "is_pipe_table",
+    "normalize_to_csv",
+    "tree_eval",
 ]

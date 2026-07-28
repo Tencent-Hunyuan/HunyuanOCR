@@ -11,11 +11,11 @@ you start it against (`inference/vLLM/serve.sh` for AR, or
 
 Post-processing (tail-repetition detection / cleanup / streaming early-stop,
 image encoding, and the doc_parse-only markdown normalization) lives in
-`inference/utils/hunyuan_utils.py` and is imported here so the exact same logic
+`inference/utils/output_utils.py` and is imported here so the exact same logic
 is shared across the single-image client, batch runners and eval pipelines.
 
 Prompt selection is LOCKED to a fixed set of official task types via
-`--task-type` (see `inference/utils/hunyuan_tasks.py`). Free-form prompt editing
+`--task-type` (see `inference/utils/tasks.py`). Free-form prompt editing
 is intentionally NOT exposed: hand-tweaked instructions were observed to
 silently degrade model quality, so users pick a task, not a prompt.
 
@@ -51,18 +51,18 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 # Shared output utilities (streaming/early-stop + doc_parse markdown normalization).
-from utils.hunyuan_tasks import (
+from utils.output_utils import (
+    clean_repeated_substrings,
+    encode_image_as_data_url,
+    infer_stream,
+    normalize_doc_parse_markdown,
+)
+from utils.tasks import (
     DEFAULT_TASK,
     TASK_DESCRIPTIONS,
     TASK_PROMPTS,
     get_prompt,
 )
-from utils.hunyuan_utils import (
-    clean_repeated_substrings,
-    encode_image_as_data_url,
-    infer_stream,
-)
-from utils.hunyuan_utils import process_one as doc_parse_normalize
 
 
 def _print_task_list():
@@ -97,7 +97,7 @@ def main():
     ap.add_argument(
         "--no-doc-postprocess",
         action="store_true",
-        help="disable the doc_parse-only markdown normalization (hunyuan_utils.process_one)",
+        help="disable the doc_parse-only markdown normalization (output_utils.normalize_doc_parse_markdown)",
     )
     ap.add_argument("--timeout", type=float, default=3600.0)
     args = ap.parse_args()
@@ -135,18 +135,18 @@ def main():
         },
     ]
 
-    common_kwargs = dict(
-        model=args.model,
-        messages=messages,
-        max_tokens=args.max_tokens,
-        temperature=args.temperature,
-        top_p=args.top_p,
-        extra_body={
+    common_kwargs = {
+        "model": args.model,
+        "messages": messages,
+        "max_tokens": args.max_tokens,
+        "temperature": args.temperature,
+        "top_p": args.top_p,
+        "extra_body": {
             "top_k": args.top_k,
             "repetition_penalty": args.repetition_penalty,
             "skip_special_tokens": True,
         },
-    )
+    }
 
     print(
         f"[info] POST http://{args.host}:{args.port}/v1/chat/completions "
@@ -172,7 +172,7 @@ def main():
     # doc_parse only: normalize markdown to OmniDocBench GT convention.
     doc_pp_stats = None
     if args.task_type == "doc_parse" and not args.no_doc_postprocess:
-        text, doc_pp_stats = doc_parse_normalize(text)
+        text, doc_pp_stats = normalize_doc_parse_markdown(text)
 
     dt = time.time() - t
 

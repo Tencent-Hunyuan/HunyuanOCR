@@ -230,7 +230,7 @@ curl -sf http://127.0.0.1:8000/v1/models
 
 ## 4. 推理
 
-> AR 与 DFlash 共用同一套客户端：`inference/vLLM/infer_vllm_client.py`（单图）和 `inference/vLLM/batch_infer.py`（批量）。它们从 `inference/utils/hunyuan_tasks.py` 与 `inference/utils/hunyuan_utils.py` 导入共享的任务 prompt 与输出工具（单份，无重复副本）。因此采样参数、任务 prompt、后处理三者完全一致，AR / DFlash / transformers 输出可直接对比。
+> AR 与 DFlash 共用同一套客户端：`inference/vLLM/infer_vllm_client.py`（单图）和 `inference/vLLM/batch_infer.py`（批量）。它们从 `inference/utils/tasks.py` 与 `inference/utils/output_utils.py` 导入共享的任务 prompt 与输出工具（单份，无重复副本）。因此采样参数、任务 prompt、后处理三者完全一致，AR / DFlash / transformers 输出可直接对比。
 
 ### 采样参数（对齐官方设置，已内置，不需要修改）
 
@@ -291,6 +291,6 @@ inference/vLLM/             # 与 AR 路径共用（详见 archive/vLLM_zh.md）
 
 > DFlash 草稿（config + dflash.py + tokenizer + model.safetensors）不提交到 Git，它来自 HF 模型仓库的 `dflash/` 子目录，与基座模型一起下载（见 §2）。
 
-> 共享工具函数（`hunyuan_tasks.py`：task_type → prompt；`hunyuan_utils.py`：输出工具，含 doc_parse 规整）单份放在 `inference/utils/`，被三套环境 A/B/C 一起 import。
+> 共享工具函数（`tasks.py`：task_type → prompt；`output_utils.py`：输出工具，含 doc_parse 规整）单份放在 `inference/utils/`，被三套环境 A/B/C 一起 import。
 
 > `config.json` 里的 `vision_config.max_image_size` 是位置编码表形状（模型结构参数），**不要**把它当作分辨率旋钮。

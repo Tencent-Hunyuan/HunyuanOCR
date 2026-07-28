@@ -164,8 +164,8 @@ inference/vLLM/
 └── batch_infer.py          # batch inference (multi-endpoint concurrency)
 ```
 
-> Shared helpers (`hunyuan_tasks.py` = task_type → official prompt mapping,
-> `hunyuan_utils.py` = streaming early-stop / cleanup + doc_parse markdown
+> Shared helpers (`tasks.py` = task_type → official prompt mapping,
+> `output_utils.py` = streaming early-stop / cleanup + doc_parse markdown
 > normalization) live in a single copy at `inference/utils/` and are imported by
 > every inference entry point (`inference/vLLM/`, `inference/DFlash/`,
 > `inference/transformers/`).

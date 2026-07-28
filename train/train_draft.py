@@ -20,28 +20,39 @@ Usage:
         --logging_steps 10
 """
 
-import os
 import logging
+import os
 import pathlib
-import torch
-from torch import nn
-import transformers
 import sys
-from dataclasses import dataclass, field
-from typing import Optional, Any, Union
+
+logger = logging.getLogger(__name__)
 from pathlib import Path
+from typing import Any
+
+import torch
+import transformers
+from torch import nn
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from train.trainer import replace_hunyuanocr_attention_class
+from transformers import (
+    AutoProcessor,
+    AutoTokenizer,
+    HunYuanVLForConditionalGeneration,
+    Trainer,
+)
+
+from train.argument import (
+    DataArguments,
+    DraftArguments,
+    ModelArguments,
+    TrainingArguments,
+)
 from train.data_processor import PackedVLDataCollator, VLDataset
-from train.argument import ModelArguments, DataArguments, TrainingArguments, DraftArguments
+from train.trainer import replace_hunyuanocr_attention_class
 
-
-from transformers import AutoTokenizer, Trainer, HunYuanVLForConditionalGeneration, AutoProcessor
-import transformers
 transformers.logging.set_verbosity_info()
 
 # from hunyuan_vl import HunYuanVLForConditionalGeneration
@@ -92,9 +103,9 @@ class DraftOnlyTrainer(Trainer):
     def compute_loss(
         self,
         model: nn.Module,
-        inputs: dict[str, Union[torch.Tensor, Any]],
+        inputs: dict[str, torch.Tensor | Any],
         return_outputs: bool = False,
-        num_items_in_batch: Optional[torch.Tensor] = None,
+        num_items_in_batch: torch.Tensor | None = None,
     ):
         # Forward pass — outputs["loss"] is a dict of scalars.
         outputs = model(**inputs)
@@ -175,7 +186,7 @@ def train(attn_implementation="flash_attention_2"):
     target_model.config.block_size = draft_args.num_mask_tokens
     target_model.config.num_draft_layers = draft_args.num_draft_layers
 
-    from train.hunyuan_vl_dflash import MYDraft
+    from train.dflash_draft import MYDraft
 
     model = MYDraft(
         config=target_model.config,
@@ -248,7 +259,7 @@ def train(attn_implementation="flash_attention_2"):
     )
 
     if list(pathlib.Path(training_args.output_dir).glob("checkpoint-*")):
-        logging.info("Checkpoint found, resuming training...")
+        logger.info("Checkpoint found, resuming training...")
         trainer.train(resume_from_checkpoint=True)
     else:
         trainer.train()

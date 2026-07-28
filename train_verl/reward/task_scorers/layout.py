@@ -18,7 +18,7 @@ from __future__ import annotations
 import json
 import re
 
-from ._shared import levenshtein_distance, normalize_text, snap_to_nearest_integer
+from .text_metrics import levenshtein_distance, normalize_text, snap_to_nearest_integer
 
 # ---------------------------------------------------------------------------
 # coordinate + format helpers
@@ -39,12 +39,12 @@ def _parse_coordinates(coord_str: str) -> list[list[int]]:
             matches = re.findall(pattern, coord_str)
             if matches:
                 return [[int(x), int(y)] for x, y in matches]
-        elif coord_str.startswith("[[") or coord_str.startswith("["):
+        elif coord_str.startswith(("[[", "[")):
             try:
                 coords = eval(coord_str) if isinstance(coord_str, str) else coord_str
                 if isinstance(coords, list) and len(coords) > 0:
                     return coords
-            except Exception:
+            except Exception:  # noqa: S110
                 pass
         if isinstance(coord_str, list):
             return coord_str
@@ -308,25 +308,26 @@ def _compare_layout_results_soft(
 # ---------------------------------------------------------------------------
 
 
-def process_layout_task(response_a: str, response_b: str) -> dict:
+def process_layout_task(response: str, ref_answer: str) -> dict:
     """Score a layout task locally.
 
     Args:
-        response_a: rollout response (prediction).
-        response_b: reference answer.
+        response: rollout response (prediction).
+        ref_answer: reference answer.
 
     Returns:
         ``{"analysis", "is_valid", "reward"}`` dict.
     """
     try:
-        format_a = _detect_layout_format(response_a)
-        format_b = _detect_layout_format(response_b)
-        layouts_a = _parse_by_format(response_a, format_a)
-        layouts_b = _parse_by_format(response_b, format_b)
+        resp_format = _detect_layout_format(response)
+        ref_format = _detect_layout_format(ref_answer)
+        layouts_pred = _parse_by_format(response, resp_format)
+        layouts_ref = _parse_by_format(ref_answer, ref_format)
 
-        is_valid, reward, reason = _compare_layout_results_soft(layouts_a, layouts_b)
+        is_valid, reward, reason = _compare_layout_results_soft(layouts_pred, layouts_ref)
         reason += (
-            f"; pred format: {format_a}, ref format: {format_b}; pred cnt: {len(layouts_a)}, ref cnt: {len(layouts_b)}"
+            f"; pred format: {resp_format}, ref format: {ref_format}"
+            f"; pred cnt: {len(layouts_pred)}, ref cnt: {len(layouts_ref)}"
         )
         return {"analysis": reason, "is_valid": is_valid, "reward": reward}
 

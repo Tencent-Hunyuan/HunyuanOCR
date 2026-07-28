@@ -14,31 +14,30 @@ Uses multiprocessing (32 processes) + threading (8 threads per process)
 for token counting.
 """
 
+import argparse
 import json
 import os
-import sys
-import argparse
 import random
+import sys
 import time
-from pathlib import Path
 from multiprocessing import Process, Queue
 from multiprocessing.pool import ThreadPool
+from pathlib import Path
 
 import binpacking
 from PIL import Image
 from tqdm import tqdm
-from transformers import AutoTokenizer
-from transformers import AutoTokenizer, AutoProcessor
+from transformers import AutoProcessor
 
 # Add project root to Python path
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-#from hunyuan_vl.processing_hunyuan_vl import HunYuanVLProcessor
-#from hunyuan_vl.image_processing_hunyuan_vl import HunYuanVLImageProcessor
+# from hunyuan_vl.processing_hunyuan_vl import HunYuanVLProcessor
+# from hunyuan_vl.image_processing_hunyuan_vl import HunYuanVLImageProcessor
 
-#from transformers import HunYuanVLProcessor
-#from transformers.models.hunyuan_vl.image_processing_hunyuan_vl import HunYuanVLImageProcessor
+# from transformers import HunYuanVLProcessor
+# from transformers.models.hunyuan_vl.image_processing_hunyuan_vl import HunYuanVLImageProcessor
 
 
 # Add project root to Python path
@@ -58,8 +57,7 @@ class DataArguments:
 # ---------------------------------------------------------------------------
 # Token calculation
 # ---------------------------------------------------------------------------
-def calculate_tokens(image_path: str, question: str, answer: str,
-                     system_prompt: str, hunyuan_processor) -> int:
+def calculate_tokens(image_path: str, question: str, answer: str, system_prompt: str, hunyuan_processor) -> int:
     """
     Calculate the total number of tokens for a single sample
     (text + image tokens).
@@ -77,9 +75,7 @@ def calculate_tokens(image_path: str, question: str, answer: str,
             {"role": "assistant", "content": answer},
         ]
 
-        text = hunyuan_processor.apply_chat_template(
-            messages, tokenize=False, add_generation_prompt=False
-        )
+        text = hunyuan_processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=False)
 
         if not os.path.exists(image_path):
             # Fallback: text-only token count
@@ -87,9 +83,7 @@ def calculate_tokens(image_path: str, question: str, answer: str,
             return len(text_tokens[0])
 
         image = Image.open(image_path).convert("RGB")
-        inputs = hunyuan_processor(
-            text=[text], images=image, padding=False, return_tensors="pt"
-        )
+        inputs = hunyuan_processor(text=[text], images=image, padding=False, return_tensors="pt")
         return len(inputs["input_ids"][0])
 
     except Exception as e:
@@ -180,9 +174,7 @@ def count_tokens_for_file(
                     return None
 
                 # Calculate tokens
-                num_tokens = calculate_tokens(
-                    img_path, question, answer, system_prompt, processor
-                )
+                num_tokens = calculate_tokens(img_path, question, answer, system_prompt, processor)
 
                 return {
                     "image": img_path,
@@ -209,8 +201,7 @@ def count_tokens_for_file(
 
         # Save counted JSONL
         with open(out_path, "w", encoding="utf-8") as f:
-            for item in results:
-                f.write(json.dumps(item, ensure_ascii=False) + "\n")
+            f.writelines(json.dumps(item, ensure_ascii=False) + "\n" for item in results)
 
         print(f"[{src.name}] Saved: {out_path} ({len(results)} samples)")
         result_queue.put((str(src), str(out_path), True))
@@ -218,6 +209,7 @@ def count_tokens_for_file(
     except Exception as e:
         print(f"[{jsonl_path}] Fatal error: {e}")
         import traceback
+
         traceback.print_exc()
         result_queue.put((str(jsonl_path), None, False))
 
@@ -234,19 +226,19 @@ def pack_data(data_list: list, pack_length: int, batch_size: int = 1024) -> list
     for i in range(0, len(data_list), batch_size):
         batch = data_list[i : i + batch_size]
         lengths = [d["num_tokens"] for d in batch]
-        grouped = binpacking.to_constant_volume(
-            list(enumerate(lengths)), pack_length, weight_pos=1
-        )
+        grouped = binpacking.to_constant_volume(list(enumerate(lengths)), pack_length, weight_pos=1)
         for group in grouped:
             group_data = []
             for idx, _ in group:
                 item = batch[idx]
-                group_data.append({
-                    "image": item["image"],
-                    "question": item["question"],
-                    "answer": item["answer"],
-                    "num_tokens": item["num_tokens"],
-                })
+                group_data.append(
+                    {
+                        "image": item["image"],
+                        "question": item["question"],
+                        "answer": item["answer"],
+                        "num_tokens": item["num_tokens"],
+                    }
+                )
             all_packed.append(group_data)
     return all_packed
 
@@ -270,64 +262,29 @@ def read_input_list(txt_path: Path) -> list[Path]:
 # Main
 # ---------------------------------------------------------------------------
 def main():
-    parser = argparse.ArgumentParser(
-        description="Integrated pipeline: JSONL -> token counting -> packing"
-    )
+    parser = argparse.ArgumentParser(description="Integrated pipeline: JSONL -> token counting -> packing")
 
     input_group = parser.add_mutually_exclusive_group(required=True)
+    input_group.add_argument("--input", type=str, nargs="+", help="One or more JSONL file paths")
     input_group.add_argument(
-        "--input", type=str, nargs="+",
-        help="One or more JSONL file paths"
-    )
-    input_group.add_argument(
-        "--input-list", type=str,
-        help="Path to a txt file containing JSONL file paths (one per line)"
+        "--input-list", type=str, help="Path to a txt file containing JSONL file paths (one per line)"
     )
 
     parser.add_argument(
-        "--model-path", type=str, default="./HunyuanOCR",
-        help="Path to HunyuanVL model (default: ./HunyuanOCR)"
+        "--model-path", type=str, default="./HunyuanOCR", help="Path to HunyuanVL model (default: ./HunyuanOCR)"
     )
+    parser.add_argument("--count-output-dir", type=str, required=True, help="Output directory for counted JSONL files")
+    parser.add_argument("--pack-output", type=str, required=True, help="Output path for the packed JSONL file")
+    parser.add_argument("--pack-length", type=int, default=20480, help="Max tokens per packed bin (default: 20480)")
+    parser.add_argument("--batch-size", type=int, default=1024, help="Batch size for binpacking (default: 1024)")
+    parser.add_argument("--max-pixels", type=int, default=2048 * 2048, help="Max image pixels (default: 2048*2048)")
+    parser.add_argument("--min-pixels", type=int, default=512 * 512, help="Min image pixels (default: 512*512)")
+    parser.add_argument("--num-processes", type=int, default=32, help="Number of parallel processes (default: 32)")
     parser.add_argument(
-        "--count-output-dir", type=str, required=True,
-        help="Output directory for counted JSONL files"
+        "--threads-per-process", type=int, default=8, help="Threads per process for image processing (default: 8)"
     )
-    parser.add_argument(
-        "--pack-output", type=str, required=True,
-        help="Output path for the packed JSONL file"
-    )
-    parser.add_argument(
-        "--pack-length", type=int, default=20480,
-        help="Max tokens per packed bin (default: 20480)"
-    )
-    parser.add_argument(
-        "--batch-size", type=int, default=1024,
-        help="Batch size for binpacking (default: 1024)"
-    )
-    parser.add_argument(
-        "--max-pixels", type=int, default=2048 * 2048,
-        help="Max image pixels (default: 2048*2048)"
-    )
-    parser.add_argument(
-        "--min-pixels", type=int, default=512 * 512,
-        help="Min image pixels (default: 512*512)"
-    )
-    parser.add_argument(
-        "--num-processes", type=int, default=32,
-        help="Number of parallel processes (default: 32)"
-    )
-    parser.add_argument(
-        "--threads-per-process", type=int, default=8,
-        help="Threads per process for image processing (default: 8)"
-    )
-    parser.add_argument(
-        "--system-prompt", type=str, default="",
-        help="System prompt to use (default: empty)"
-    )
-    parser.add_argument(
-        "--seed", type=int, default=42,
-        help="Random seed for shuffling (default: 42)"
-    )
+    parser.add_argument("--system-prompt", type=str, default="", help="System prompt to use (default: empty)")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed for shuffling (default: 42)")
 
     args = parser.parse_args()
 
@@ -406,12 +363,10 @@ def main():
         for p in processes:
             p.join()
 
-        print(f"  Batch [{batch_start+1}-{batch_start+len(batch_paths)}/"
-              f"{len(valid_paths)}] done")
+        print(f"  Batch [{batch_start + 1}-{batch_start + len(batch_paths)}/{len(valid_paths)}] done")
 
     elapsed = time.time() - start_time
-    print(f"\nToken counting complete in {elapsed:.1f}s: "
-          f"{len(count_files)}/{len(valid_paths)} files succeeded")
+    print(f"\nToken counting complete in {elapsed:.1f}s: {len(count_files)}/{len(valid_paths)} files succeeded")
 
     # ------------------------------------------------------------------
     # 3. Collect all samples, shuffle
@@ -461,8 +416,7 @@ def main():
     pack_output_path.parent.mkdir(parents=True, exist_ok=True)
 
     with open(pack_output_path, "w", encoding="utf-8") as f:
-        for group in packed:
-            f.write(json.dumps(group, ensure_ascii=False) + "\n")
+        f.writelines(json.dumps(group, ensure_ascii=False) + "\n" for group in packed)
 
     total_elapsed = time.time() - start_time
     print(f"\n{'=' * 60}")

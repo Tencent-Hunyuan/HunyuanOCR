@@ -1,0 +1,33 @@
+# Ruff configuration for the HunyuanOCR-1.5 open-source tree.
+
+exclude = [
+    ".git",
+    ".workbuddy",
+    "__pycache__",
+    "verl",            # upstream verl fork clone
+    "verl-HYOCR",      # personal fork clone
+    "HunyuanOCR_v1.0", # historical release, frozen
+]
+
+[lint]
+# Rules deliberately silenced project-wide:
+#
+#   BLE001  blind-except
+#     Rule-based scorers, batch inference workers, and post-processors all
+#     use ``except Exception`` on purpose to keep training / batch jobs alive
+#     when a single sample or side-effect fails. Bare ``Exception`` here is
+#     defensive, not sloppy.
+#
+#   RUF012  mutable-class-default
+#     HuggingFace transformers models register class attributes such as
+#     ``_no_split_modules`` / ``_tied_weights_keys`` / ``_tp_plan`` as plain
+#     lists / dicts on the class. Wrapping them in ``ClassVar`` or moving
+#     them into ``__init__`` would break the framework's introspection.
+ignore = ["BLE001", "RUF012"]
+
+[lint.per-file-ignores]
+# Inference / training scripts use ``_`` as a throw-away tuple element for
+# stats and shape peeks; RUF059 (unused unpacked variable) is noise there.
+"inference/**/*.py" = ["RUF059"]
+"train/**/*.py"     = ["RUF059"]
+"tools/**/*.py"     = ["RUF059"]

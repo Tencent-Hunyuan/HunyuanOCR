@@ -182,7 +182,7 @@ script's header docstring):
 | repetition_penalty         | 1.08               | `generate(repetition_penalty=1.08)`                                                             |
 | tail-repetition early-stop | ✅                 | `TailRepetitionStop` StoppingCriteria, replicating vLLM's streaming `has_tail_repetition` logic |
 | tail-repetition cleanup    | ✅                 | `clean_repeated_substrings` (final fallback)                                                    |
-| doc_parse normalization    | ✅ (on by default) | `hunyuan_utils.process_one`, shared with the vLLM client                                        |
+| doc_parse normalization    | ✅ (on by default) | `output_utils.normalize_doc_parse_markdown`, shared with the vLLM client                        |
 | skip_special_tokens        | True               | `batch_decode(skip_special_tokens=True)`                                                        |
 
 Model loading follows the official HunyuanOCR HuggingFace inference recipe:
@@ -199,8 +199,8 @@ inference/transformers/
 └── infer_hf_8gpu.py   # multi-GPU transformers inference (self-contained: load/early-stop/cleanup)
 ```
 
-> The doc_parse markdown normalization (`process_one`) is imported from
-> `inference/utils/hunyuan_utils.py` — a single shared copy across
+> The doc_parse markdown normalization (`normalize_doc_parse_markdown`) is imported from
+> `inference/utils/output_utils.py` — a single shared copy across
 > `inference/vLLM/`, `inference/DFlash/`, and `inference/transformers/`.
 
 > Image resolution uses the model default (`max_pixels ≈ 4096×4096`); no
