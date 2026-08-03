@@ -76,31 +76,26 @@ PACK_OUTPUT=./data/parsing_packed_20480.jsonl \
 
 ### Output schema (packed JSONL)
 
-Each output line contains:
+Each output line is a JSON array. Each item is the sample consumed by the training dataset:
 
 ```json
-{
-    "packed_samples": [
-        {
-            "image_path": ["/abs/path/1.png"],
-            "conversations": [...]
-        },
-        {
-            "image_path": ["/abs/path/2.png"],
-            "conversations": [...]
-        },
-        ...
-    ],
-    "cu_seqlens": [0, 4123, 8567, ..., 20351],
-    "total_tokens": 20351
-}
+[
+    {
+        "image": "/abs/path/1.png",
+        "question": "Extract the text from the image",
+        "answer": "Recognized document text",
+        "num_tokens": 4123
+    },
+    {
+        "image": "/abs/path/2.png",
+        "question": "Extract the text from the image",
+        "answer": "Recognized document text",
+        "num_tokens": 4444
+    }
+]
 ```
 
-**Fields:**
-
-- `packed_samples`: original raw samples concatenated in this pack
-- `cu_seqlens`: cumulative token boundaries (for FlashAttention varlen)
-- `total_tokens`: sum ≤ `pack_length`
+The sum of `num_tokens` in one array is at most `pack_length`. `cu_seqlens` is recomputed by the training collator and is not stored in the JSONL.
 
 ### Performance tips
 
@@ -117,9 +112,9 @@ python -c "
 import json
 with open('./data/parsing_packed_20480.jsonl') as f:
     for i, line in enumerate(f):
-        r = json.loads(line)
-        print(f'pack {i}: {len(r[\"packed_samples\"])} samples, '
-              f'{r[\"total_tokens\"]} tokens')
+        pack = json.loads(line)
+        print(f'pack {i}: {len(pack)} samples, '
+              f'{sum(item.get(\"num_tokens\", 0) for item in pack)} tokens')
         if i >= 3: break
 "
 ```

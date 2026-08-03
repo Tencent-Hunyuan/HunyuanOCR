@@ -9,6 +9,23 @@ import torch
 from PIL import Image
 from torch.utils.data import Dataset
 from transformers import HunYuanVLProcessor
+from transformers.models.hunyuan_vl.modeling_hunyuan_vl import HunYuanVLModel
+
+
+class _RopeIndexShim:
+    """Lightweight carrier that reuses the model's exact multimodal position-id logic.
+
+    ``HunYuanVLModel.get_rope_index`` / ``get_vision_position_ids`` depend only on
+    ``self.config`` (no weights, no submodules), so we bind them to a shim holding just
+    the config. This guarantees the packed collator's per-sample position_ids match the
+    model's own convention without instantiating the full (multi-billion parameter) model.
+    """
+
+    get_rope_index = HunYuanVLModel.get_rope_index
+    get_vision_position_ids = HunYuanVLModel.get_vision_position_ids
+
+    def __init__(self, config):
+        self.config = config
 
 
 class VLDataset(Dataset):
@@ -23,12 +40,17 @@ class VLDataset(Dataset):
         image_lmdb_root: str | None = None,
         max_length: int = 2048,
         is_packed: bool = False,
+        model_config: Any = None,
     ):
         super().__init__()
         self.processor = processor
         self.max_length = max_length
         self.image_folder = image_folder
         self.is_packed = is_packed
+        # For packed training we must emit per-sample multimodal position_ids that restart
+        # at each sample boundary. We reuse the model's own get_rope_index via a config-only
+        # shim so the layout matches the model exactly.
+        self._rope_shim = _RopeIndexShim(model_config) if (is_packed and model_config is not None) else None
 
         # Load data from one or more files (comma-separated paths supported)
         # Supports both JSON (.json) and JSONL (.jsonl) formats
@@ -196,6 +218,7 @@ class VLDataset(Dataset):
             text=[text],
             images=image,
             padding=False,
+            return_mm_token_type_ids=True,
             return_tensors="pt",
         )
 
@@ -203,10 +226,10 @@ class VLDataset(Dataset):
         input_ids = inputs["input_ids"][0]
         labels = input_ids.clone()
 
-        # Mask image tokens (ignore loss for image tokens)
-        # image_token_id = 120120  # self.processor.image_token_id
-        # image_token_mask = (input_ids == image_token_id)
-        # labels[inputs["image_mask"][0]] = -100
+        # Image placeholders and the prompt are context, not prediction targets.
+        image_token_id = getattr(self.processor, "image_token_id", None)
+        if image_token_id is not None:
+            labels[input_ids == image_token_id] = -100
 
         # Mask the prompt part (only compute loss on assistant's response)
         # Find the assistant token position
@@ -219,17 +242,38 @@ class VLDataset(Dataset):
             text=[assistant_text],
             images=image,
             padding=False,
+            return_mm_token_type_ids=True,
             return_tensors="pt",
         )
         prompt_length = assistant_inputs["input_ids"].shape[1]
         labels[:prompt_length] = -100  # Ignore loss for prompt tokens
 
+        mm_token_type_ids = inputs.get("mm_token_type_ids")
+        if mm_token_type_ids is not None and mm_token_type_ids.shape[0] == 1:
+            mm_token_type_ids = mm_token_type_ids[0]
+
+        # For packed training, precompute this sample's multimodal 3D position_ids using the
+        # model's own get_rope_index (via the config-only shim). These positions start at 0 for
+        # every sample; concatenating them in the packed collator — together with a block-diagonal
+        # causal mask — reproduces the varlen/packed attention semantics natively.
+        position_ids = None
+        if self._rope_shim is not None:
+            rope_positions, _ = self._rope_shim.get_rope_index(
+                input_ids=inputs["input_ids"],
+                mm_token_type_ids=inputs["mm_token_type_ids"],
+                image_grid_thw=inputs.get("image_grid_thw"),
+                attention_mask=inputs["attention_mask"],
+            )
+            # rope_positions: [num_mrope_axes, batch=1, seq_len] -> drop batch dim
+            position_ids = rope_positions[:, 0, :]
+
         return {
             "input_ids": input_ids,
-            "attention_mask": inputs["attention_mask"],
-            "pixel_values": inputs.get("pixel_values", None),
-            "image_grid_thw": inputs.get("image_grid_thw", None),
-            "position_ids": inputs["position_ids"],
+            "attention_mask": inputs["attention_mask"][0],
+            "pixel_values": inputs.get("pixel_values"),
+            "image_grid_thw": inputs.get("image_grid_thw"),
+            "position_ids": position_ids,
+            "mm_token_type_ids": mm_token_type_ids,
             "labels": labels,
         }
 
@@ -239,12 +283,14 @@ class PackedVLDataCollator:
     Data collator that packs multiple samples into a single sequence.
     This is more efficient than padding, especially when samples have varying lengths.
 
-    Key features:
-    - Concatenates multiple samples into one sequence
-    - Creates block-diagonal attention mask to isolate different samples
-    - Generates correct position_ids for each sample (restarting from 0)
-    - Handles image tokens correctly
-    - Supports MTP (Multi-Token Prediction) extra data packing
+    Packing is expressed entirely through inputs the native HunYuanVL forward already
+    understands — no attention monkey-patching:
+    - Concatenates the packed samples into one [1, total_len] sequence.
+    - Emits a block-diagonal additive causal mask [1, 1, L, L] so each sample only attends
+      within itself (varlen semantics).
+    - Concatenates each sample's multimodal 3D position_ids (each restarting from 0), which
+      the dataset precomputes via the model's own get_rope_index.
+    - Merges visual inputs as flat pixel_values / [num_images, 3] image_grid_thw.
     """
 
     def __init__(self, processor: HunYuanVLProcessor, packed_max_length: int = 2048):
@@ -264,30 +310,26 @@ class PackedVLDataCollator:
                 "expected a Processor with .tokenizer or a Tokenizer instance."
             )
 
-    def _create_packed_attention_mask(self, sample_lengths: list[int], device: torch.device) -> torch.Tensor:
-        """
-        Create block-diagonal attention mask for packed sequences.
-        Each sample can only attend to tokens within the same sample.
+    def _create_packed_causal_mask(self, sample_lengths: list[int], dtype: torch.dtype) -> torch.Tensor:
+        """Block-diagonal causal mask for a packed sequence.
 
-        Args:
-            sample_lengths: List of lengths for each sample in the packed sequence
-            device: Device to create the mask on
-
-        Returns:
-            Attention mask of shape [total_length, total_length]
+        Returns an additive mask of shape ``[1, 1, L, L]`` where, within each sample block,
+        a token may attend to itself and earlier tokens of the same sample, and everything
+        outside its own block is masked with ``-inf``. This is exactly the varlen/packed
+        attention pattern, expressed in the form the native HunYuanVL forward consumes.
         """
         total_length = sum(sample_lengths)
-        # Create mask with 1s (allowed) and 0s (blocked)
-        mask = torch.zeros((total_length, total_length), dtype=torch.bool, device=device)
-
+        min_val = torch.finfo(dtype).min
+        mask = torch.full((total_length, total_length), min_val, dtype=dtype)
         start_idx = 0
         for length in sample_lengths:
             end_idx = start_idx + length
-            # Allow attention within this sample
-            mask[start_idx:end_idx, start_idx:end_idx] = True
+            block = torch.triu(
+                torch.full((length, length), min_val, dtype=dtype), diagonal=1
+            )
+            mask[start_idx:end_idx, start_idx:end_idx] = block
             start_idx = end_idx
-
-        return mask
+        return mask.unsqueeze(0).unsqueeze(0)
 
     def __call__(self, features: list[Any]) -> dict[str, torch.Tensor]:
         """
@@ -304,34 +346,33 @@ class PackedVLDataCollator:
             # We expect batch_size=1 for packed data, so features[0] is the packed batch
             features = features[0]
 
-        # Now features is a list of dicts, process normally
-        # Separate different types of inputs
         all_input_ids = [f["input_ids"] for f in features]
         all_labels = [f["labels"] for f in features]
         all_position_ids = [f["position_ids"] for f in features]
 
-        # Pack sequences: original tokens first, MTP tokens appended at the end
-        packed_input_ids = []  # Original sequence tokens
-        packed_labels = []  # Original sequence labels
-        packed_position_ids = []  # Original sequence position_ids
+        packed_input_ids = []
+        packed_labels = []
+        packed_position_ids = []  # each entry is [num_mrope_axes, seq_len]
         sample_lengths = []
 
         current_length = 0
-        packed_sample_indices = []  # Track which samples were actually packed
+        packed_sample_indices = []
         for idx, (input_ids, labels, position_ids) in enumerate(zip(all_input_ids, all_labels, all_position_ids)):
+            if position_ids is None:
+                raise ValueError(
+                    "PackedVLDataCollator requires per-sample position_ids. The processor did not "
+                    "return position_ids for a sample; ensure the HunYuanVL processor emits them."
+                )
             seq_len = len(input_ids)
 
-            # Check if adding this sample would exceed max_length
             if current_length + seq_len > self.max_length:
-                # If we haven't added any samples yet, truncate this one
                 if current_length == 0:
                     packed_input_ids.append(input_ids[: self.max_length])
                     packed_labels.append(labels[: self.max_length])
-                    packed_position_ids.append(position_ids[:, :, : self.max_length])
+                    packed_position_ids.append(position_ids[:, : self.max_length])
                     sample_lengths.append(self.max_length)
                     packed_sample_indices.append(idx)
                     current_length = self.max_length
-                # Otherwise, stop packing
                 break
 
             packed_input_ids.append(input_ids)
@@ -341,13 +382,13 @@ class PackedVLDataCollator:
             packed_sample_indices.append(idx)
             current_length += seq_len
 
-        # Concatenate original sequences
         packed_input_ids = torch.cat(packed_input_ids, dim=0)
         packed_labels = torch.cat(packed_labels, dim=0)
-        packed_position_ids = torch.cat(packed_position_ids, dim=2)
+        # position_ids per sample are [num_mrope_axes, seq_len]; concat along the sequence axis.
+        # Each sample already restarts positions from 0, which — combined with the block-diagonal
+        # mask below — reproduces the varlen/packed attention semantics natively.
+        packed_position_ids = torch.cat(packed_position_ids, dim=-1).unsqueeze(1)  # [axes, 1, total_len]
 
-        # Only collect pixel_values and image_grid_thw from samples that were actually packed
-        # This prevents mismatch between image tokens in input_ids and image features
         all_pixel_values = [
             features[i]["pixel_values"] for i in packed_sample_indices if features[i]["pixel_values"] is not None
         ]
@@ -355,26 +396,19 @@ class PackedVLDataCollator:
             features[i]["image_grid_thw"] for i in packed_sample_indices if features[i]["image_grid_thw"] is not None
         ]
 
-        # 构建attention_mask = cumsum_seq_lens, 使其能够用于flash attention
-        # cu_seqlens only covers original sample lengths (MTP is handled separately)
-        cumsum_seq_lens = torch.cumsum(torch.tensor([0] + sample_lengths), dim=0, dtype=torch.int32)
-        attention_mask = cumsum_seq_lens
+        attention_mask = self._create_packed_causal_mask(sample_lengths, dtype=torch.float32)
 
-        # Prepare batch (add batch dimension)
         batch = {
             "input_ids": packed_input_ids.unsqueeze(0),  # [1, total_length]
-            "attention_mask": attention_mask,  # cumsum_seq_lens for flash attention (original only)
-            "position_ids": packed_position_ids,  # [1, 4, total_length]
+            "attention_mask": attention_mask,  # block-diagonal additive causal mask [1, 1, L, L]
+            "position_ids": packed_position_ids,  # [num_mrope_axes, 1, total_length]
             "labels": packed_labels.unsqueeze(0),  # [1, total_length]
         }
 
-        # Handle image inputs
         if all_pixel_values:
             batch["pixel_values"] = torch.cat(all_pixel_values, dim=0)
-
         if all_image_grid_thw:
             batch["image_grid_thw"] = torch.cat(all_image_grid_thw, dim=0)
-        # print('input_ids', batch['input_ids'].shape, 'image_mask', batch['image_mask'].shape)
         return batch
 
 
@@ -386,44 +420,39 @@ class VLDataCollator:
         self.max_length = max_length
 
     def __call__(self, features: list[dict[str, Any]]) -> dict[str, torch.Tensor]:
-        # Separate different types of inputs
         input_ids = [f["input_ids"] for f in features]
         attention_mask = [f["attention_mask"] for f in features]
         labels = [f["labels"] for f in features]
-        pixel_values = [f["pixel_values"] for f in features if f["pixel_values"] is not None]
-        image_grid_thw = [f["image_grid_thw"] for f in features if f["image_grid_thw"] is not None]
-        [f["position_ids"] for f in features]
+        max_len = min(max(ids.shape[-1] for ids in input_ids), self.max_length)
+        pad_token_id = self.processor.tokenizer.pad_token_id
 
-        # Pad sequences
-        max_len = min(max(len(ids) for ids in input_ids), self.max_length)
-
-        padded_input_ids = []
-        padded_attention_mask = []
-        padded_labels = []
-
-        for ids, mask, label in zip(input_ids, attention_mask, labels):
-            padding_length = max_len - len(ids)
-            if padding_length > 0:
-                padded_input_ids.append(
-                    torch.cat([ids, torch.full((padding_length,), self.processor.tokenizer.pad_token_id)])
-                )
-                padded_attention_mask.append(torch.cat([mask, torch.zeros(padding_length, dtype=mask.dtype)]))
-                padded_labels.append(torch.cat([label, torch.full((padding_length,), -100)]))
-            else:
-                padded_input_ids.append(ids[:max_len])
-                padded_attention_mask.append(mask[:max_len])
-                padded_labels.append(label[:max_len])
+        def pad_sequence(tensor: torch.Tensor, value: int | bool) -> torch.Tensor:
+            tensor = tensor[..., :max_len]
+            padding_length = max_len - tensor.shape[-1]
+            if padding_length == 0:
+                return tensor
+            padding_shape = (*tensor.shape[:-1], padding_length)
+            padding = torch.full(padding_shape, value, dtype=tensor.dtype, device=tensor.device)
+            return torch.cat([tensor, padding], dim=-1)
 
         batch = {
-            "input_ids": torch.stack(padded_input_ids),
-            "attention_mask": torch.stack(padded_attention_mask),
-            "labels": torch.stack(padded_labels),
+            "input_ids": torch.stack([pad_sequence(ids, pad_token_id) for ids in input_ids]),
+            "attention_mask": torch.stack([pad_sequence(mask, False) for mask in attention_mask]),
+            "labels": torch.stack([pad_sequence(label, -100) for label in labels]),
         }
 
+        optional_token_fields = ("position_ids", "mm_token_type_ids")
+        for field in optional_token_fields:
+            values = [f.get(field) for f in features]
+            if all(value is not None for value in values):
+                batch[field] = torch.stack([pad_sequence(value, 0) for value in values])
+
+        pixel_values = [f["pixel_values"] for f in features if f.get("pixel_values") is not None]
+        image_grid_thw = [f["image_grid_thw"] for f in features if f.get("image_grid_thw") is not None]
         if pixel_values:
-            batch["pixel_values"] = torch.stack(pixel_values)
+            batch["pixel_values"] = torch.cat(pixel_values, dim=0)
         if image_grid_thw:
-            batch["image_grid_thw"] = torch.stack(image_grid_thw)
+            batch["image_grid_thw"] = torch.cat(image_grid_thw, dim=0)
 
         return batch
 

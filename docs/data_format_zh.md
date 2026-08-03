@@ -76,31 +76,26 @@ PACK_OUTPUT=./data/parsing_packed_20480.jsonl \
 
 ### 输出格式（打包后的 JSONL）
 
-每一行输出格式如下：
+每一行是一个 JSON 数组，数组中的每项是训练 dataset 实际消费的样本：
 
 ```json
-{
-    "packed_samples": [
-        {
-            "image_path": ["/abs/path/1.png"],
-            "conversations": [...]
-        },
-        {
-            "image_path": ["/abs/path/2.png"],
-            "conversations": [...]
-        },
-        ...
-    ],
-    "cu_seqlens": [0, 4123, 8567, ..., 20351],
-    "total_tokens": 20351
-}
+[
+    {
+        "image": "/abs/path/1.png",
+        "question": "提取图片中的文字",
+        "answer": "识别出的正文",
+        "num_tokens": 4123
+    },
+    {
+        "image": "/abs/path/2.png",
+        "question": "提取图片中的文字",
+        "answer": "识别出的正文",
+        "num_tokens": 4444
+    }
+]
 ```
 
-**字段：**
-
-- `packed_samples`：本 pack 内拼接的原始样本
-- `cu_seqlens`：累计 token 边界（供 FlashAttention varlen 使用）
-- `total_tokens`：合计 ≤ `pack_length`
+数组内样本的 `num_tokens` 总和不超过 `pack_length`。`cu_seqlens` 由训练 collator 根据实际处理后的序列重新计算，不写入 JSONL。
 
 ### 性能提示
 
@@ -117,9 +112,9 @@ python -c "
 import json
 with open('./data/parsing_packed_20480.jsonl') as f:
     for i, line in enumerate(f):
-        r = json.loads(line)
-        print(f'pack {i}: {len(r[\"packed_samples\"])} samples, '
-              f'{r[\"total_tokens\"]} tokens')
+        pack = json.loads(line)
+        print(f'pack {i}: {len(pack)} samples, '
+              f'{sum(item.get(\"num_tokens\", 0) for item in pack)} tokens')
         if i >= 3: break
 "
 ```
