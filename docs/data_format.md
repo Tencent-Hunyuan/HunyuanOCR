@@ -12,7 +12,26 @@ The pipeline: raw JSONL → tokenize + count → pack → training-ready JSONL.
 
 ## 1. Raw OCR JSONL Schema
 
-Each line in a raw JSONL file is one training sample:
+Each line in a raw JSONL file is one training sample. The packing script's `normalize_sample()`
+accepts two input formats, resolved in the following priority order.
+
+### Format A (preferred): `conv` + `img_path_sh` / `img_path_cq`
+
+```json
+{
+  "img_path_sh": "/absolute/path/to/image.png",
+  "conv": [
+    { "question": "Extract all body text from the document image as markdown...", "answer": "# Title\n\nBody text ..." }
+  ]
+}
+```
+
+| Field                       | Type         | Required | Notes                                                                      |
+| --------------------------- | ------------ | -------- | -------------------------------------------------------------------------- |
+| `img_path_sh`/`img_path_cq` | `str`        | ✅       | Absolute image path; `img_path_sh` is used if present, else `img_path_cq`. |
+| `conv`                      | `list[dict]` | ✅       | The 0-th turn's `question` / `answer` is used.                             |
+
+### Format B (fallback): `image_path` + `conversations`
 
 ```json
 {
@@ -20,19 +39,20 @@ Each line in a raw JSONL file is one training sample:
   "conversations": [
     {
       "from": "human",
-      "value": "<image>\n提取文档图片中正文的所有信息用markdown格式表示..."
+      "value": "<image>\nExtract all body text from the document image as markdown..."
     },
     { "from": "gpt", "value": "# Title\n\nBody text ..." }
   ]
 }
 ```
 
-**Fields:**
+| Field           | Type         | Required | Notes                                                                                |
+| --------------- | ------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `image_path`    | `list[str]`  | ✅       | List of absolute paths; the first image is used.                |
+| `conversations` | `list[dict]` | ✅       | Alternating `human`/`gpt` (or `user`/`assistant`) turns. The `<image>` placeholder in the `human` value is stripped and the remainder becomes the question. |
 
-| Field           | Type         | Required | Notes                                                                                                      |
-| --------------- | ------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `image_path`    | `list[str]`  | ✅       | Absolute paths. Usually 1 image; multi-image supported.                                                    |
-| `conversations` | `list[dict]` | ✅       | Alternating `human` / `gpt` turns. `<image>` placeholder in `human` value indicates image insertion point. |
+> Format B is only used when the sample has no `conv` field. Both formats are normalized to an
+> `image` / `question` / `answer` triple.
 
 ## 2. Packing Pipeline
 

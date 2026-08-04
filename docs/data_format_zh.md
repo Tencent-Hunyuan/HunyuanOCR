@@ -12,7 +12,25 @@
 
 ## 1. 原始 OCR JSONL 格式
 
-原始 JSONL 每行是一条训练样本：
+原始 JSONL 每行是一条训练样本。打包脚本 `normalize_sample()` 同时支持两种输入格式，并按下述优先级解析。
+
+### 格式 A（优先）：`conv` + `img_path_sh` / `img_path_cq`
+
+```json
+{
+  "img_path_sh": "/absolute/path/to/image.png",
+  "conv": [
+    { "question": "提取文档图片中正文的所有信息用markdown格式表示...", "answer": "# Title\n\nBody text ..." }
+  ]
+}
+```
+
+| 字段                | 类型         | 是否必填 | 说明|
+| --------------------------- | ------------ | :------: | ----------------------------------------------------------------- |
+| `img_path_sh`/`img_path_cq` | `str`        |    ✅    | 图片绝对路径，优先取 `img_path_sh`，否则取 `img_path_cq`。        |
+| `conv`                | `list[dict]` |    ✅    | 取第 0 项的 `question` / `answer`。                               |
+
+### 格式 B（兼容）：`image_path` + `conversations`
 
 ```json
 {
@@ -27,12 +45,12 @@
 }
 ```
 
-**字段说明：**
-
-| 字段            | 类型         | 是否必填 | 说明                                                                                            |
+| 字段            | 类型         | 是否必填 | 说明|
 | --------------- | ------------ | :------: | ----------------------------------------------------------------------------------------------- |
-| `image_path`    | `list[str]`  |    ✅    | 绝对路径。通常 1 张图，也支持多图。                                                             |
-| `conversations` | `list[dict]` |    ✅    | `human` / `gpt` 交替对话。`human` 值中的 `<image>` 占位符表示图片插入点。                       |
+| `image_path`    | `list[str]`  |    ✅    | 绝对路径列表，取第 0 张。|
+| `conversations` | `list[dict]` |    ✅    | `human`/`gpt`（或 `user`/`assistant`）交替对话；`human` 值中的 `<image>` 占位符会被去除后作为 question。 |
+
+> 只有当样本不含 `conv` 字段时才回退到格式 B。两种格式最终都会被规范化为 `image` / `question` / `answer`三元组。
 
 ## 2. 打包流水线
 
