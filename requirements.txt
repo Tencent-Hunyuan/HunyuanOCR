@@ -14,6 +14,8 @@ tokenizers>=0.20.0
 Pillow>=10.0.0
 opencv-python>=4.8.0
 numpy>=1.24.0
+lmdb>=1.4.0
+binpacking>=1.5.2
 
 # Distributed / performance
 einops>=0.7.0

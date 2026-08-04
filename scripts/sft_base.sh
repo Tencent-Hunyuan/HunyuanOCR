@@ -12,7 +12,7 @@
 # Multi-node: pass NNODES / NODE_RANK / MASTER_ADDR / MASTER_PORT as env vars.
 # ============================================================================
 
-set -e
+set -euo pipefail
 
 # Activate your Python environment before running:
 #   source /path/to/miniconda3/bin/activate && conda activate hyocr
@@ -43,6 +43,11 @@ batch_size=${BATCH_SIZE:-1}
 grad_accum_steps=${GRAD_ACCUM:-1}
 num_epochs=${EPOCHS:-5}
 save_steps=${SAVE_STEPS:-200}
+data_flatten=${DATA_FLATTEN:-True}
+data_packing=${DATA_PACKING:-True}
+packed_max_length=${PACKED_MAX_LENGTH:-20480}
+dataloader_workers=${DATALOADER_WORKERS:-4}
+max_steps=${MAX_STEPS:--1}
 
 entry_file=train/train_hunyuan.py
 
@@ -64,37 +69,39 @@ echo "  grad_accum    : ${grad_accum_steps}"
 echo "========================================"
 
 # ────────────── Training args ──────────────
-args="
-    --model_name_or_path ${model_name_or_path} \
-    --train_data_path ${train_data_path} \
-    --image_folder ${image_path} \
-    --data_flatten True \
-    --data_packing True \
-    --tune_mm_vision True \
-    --tune_mm_mlp True \
-    --tune_mm_llm True \
-    --bf16 \
-    --output_dir ${output_dir} \
-    --num_train_epochs ${num_epochs} \
-    --per_device_train_batch_size ${batch_size} \
-    --per_device_eval_batch_size $((batch_size*2)) \
-    --gradient_accumulation_steps ${grad_accum_steps} \
-    --eval_strategy no \
-    --save_strategy steps \
-    --save_steps ${save_steps} \
-    --save_total_limit 3 \
-    --learning_rate ${lr} \
-    --weight_decay 0.01 \
-    --warmup_ratio 0.03 \
-    --max_grad_norm 1 \
-    --lr_scheduler_type cosine_with_min_lr \
-    --logging_steps 1 \
-    --packed_max_length 20480 \
-    --gradient_checkpointing True \
-    --dataloader_num_workers 4 \
-    --run_name ${run_name} \
-    --logging_dir ${TENSORBOARD_DIR} \
-    --report_to tensorboard"
+args=(
+    --model_name_or_path "$model_name_or_path"
+    --train_data_path "$train_data_path"
+    --image_folder "$image_path"
+    --data_flatten "$data_flatten"
+    --data_packing "$data_packing"
+    --tune_mm_vision True
+    --tune_mm_mlp True
+    --tune_mm_llm True
+    --bf16
+    --output_dir "$output_dir"
+    --num_train_epochs "$num_epochs"
+    --max_steps "$max_steps"
+    --per_device_train_batch_size "$batch_size"
+    --per_device_eval_batch_size "$((batch_size * 2))"
+    --gradient_accumulation_steps "$grad_accum_steps"
+    --eval_strategy no
+    --save_strategy steps
+    --save_steps "$save_steps"
+    --save_total_limit 3
+    --learning_rate "$lr"
+    --weight_decay 0.01
+    --warmup_ratio 0.03
+    --max_grad_norm 1
+    --lr_scheduler_type cosine_with_min_lr
+    --logging_steps 1
+    --packed_max_length "$packed_max_length"
+    --gradient_checkpointing True
+    --dataloader_num_workers "$dataloader_workers"
+    --run_name "$run_name"
+    --logging_dir "$TENSORBOARD_DIR"
+    --report_to tensorboard
+)
 
 # ────────────── Launch ──────────────
 echo "Launch training on NODE_RANK=${NODE_RANK}"
@@ -103,4 +110,4 @@ torchrun --nproc_per_node="${NPROC_PER_NODE}" \
          --master_port="${MASTER_PORT}" \
          --node_rank="${NODE_RANK}" \
          --nnodes="${NNODES}" \
-         ${entry_file} "${args}" 2>&1 | tee "${output_dir}/train_${NODE_RANK}.log"
+         "${entry_file}" "${args[@]}" 2>&1 | tee "${output_dir}/train_${NODE_RANK}.log"

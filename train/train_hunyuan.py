@@ -42,7 +42,6 @@ from train.argument import (
     TrainingArguments,
 )
 from train.data_processor import PackedVLDataCollator, VLDataCollator, VLDataset
-from train.trainer import replace_hunyuanocr_attention_class
 
 transformers.logging.set_verbosity_info()
 
@@ -51,8 +50,9 @@ local_rank = None
 
 logging.basicConfig(level=logging.INFO, force=True)
 
+
 def rank0_print(*args):
-    if local_rank == 0:
+    if local_rank in (None, 0):
         print(*args)
 
 
@@ -87,19 +87,22 @@ def set_model(model_args, model):
             p.requires_grad = False
 
     if model_args.tune_mm_llm:
-        for n, p in model.model.named_parameters():
+        for _, p in model.model.named_parameters():
             p.requires_grad = True
-        model.lm_head.requires_grad = True
+        for p in model.lm_head.parameters():
+            p.requires_grad = True
     else:
-        for n, p in model.model.named_parameters():
+        for _, p in model.model.named_parameters():
             p.requires_grad = False
-        model.lm_head.requires_grad = False
+        for p in model.lm_head.parameters():
+            p.requires_grad = False
 
 
-def train(attn_implementation="flash_attention_2"):
+def train(attn_implementation=None):
     global local_rank
 
-
+    if attn_implementation is None:
+        attn_implementation = os.environ.get("HYOCR_ATTN_IMPLEMENTATION", "eager")
 
     parser = transformers.HfArgumentParser(
         (ModelArguments, DataArguments, TrainingArguments)
@@ -109,9 +112,8 @@ def train(attn_implementation="flash_attention_2"):
     
 
     local_rank = training_args.local_rank
-    # if not training_args.use_deepspeed:
-    #     torch.distributed.init_process_group(backend='nccl')
-    #     torch.cuda.set_device(torch.device(f'cuda:{local_rank}'))
+    if local_rank is None or local_rank < 0:
+        local_rank = int(os.environ.get("LOCAL_RANK", "0"))
     os.makedirs(training_args.output_dir, exist_ok=True)
 
     training_args.lr_scheduler_kwargs = {'min_lr': 2e-6}
@@ -146,8 +148,9 @@ def train(attn_implementation="flash_attention_2"):
             trust_remote_code=True
         )
 
-    if data_args.data_flatten or data_args.data_packing:
-        replace_hunyuanocr_attention_class()
+    # Packed/flatten training uses the model's native packing support (block-diagonal
+    # causal mask + per-sample position_ids emitted by PackedVLDataCollator); no attention
+    # monkey-patching is required.
     model.config.use_cache = False
 
     if training_args.gradient_checkpointing:
@@ -179,7 +182,7 @@ def train(attn_implementation="flash_attention_2"):
     else:
         set_model(model_args, model)
 
-        if torch.distributed.get_rank() == 0:
+        if local_rank == 0:
             model.vit.print_trainable_parameters()
             model.model.print_trainable_parameters()
 
@@ -193,6 +196,7 @@ def train(attn_implementation="flash_attention_2"):
         processor=processor,
         max_length=data_args.packed_max_length,
         is_packed=data_args.data_flatten or data_args.data_packing,
+        model_config=model.config,
     )
     
     eval_dataset = None
@@ -233,4 +237,7 @@ def train(attn_implementation="flash_attention_2"):
 
 
 if __name__ == "__main__":
-    train(attn_implementation="flash_attention_2")
+    # attn_implementation defaults to eager (overridable via HYOCR_ATTN_IMPLEMENTATION).
+    # The packed path uses a block-diagonal 4D causal mask that eager/sdpa consume directly;
+    # flash_attention_2 expects varlen cu_seqlens instead, so do not hard-code it here.
+    train()

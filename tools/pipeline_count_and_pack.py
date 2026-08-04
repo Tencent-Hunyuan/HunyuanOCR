@@ -55,6 +55,37 @@ class DataArguments:
 
 
 # ---------------------------------------------------------------------------
+# Input schema normalization
+# ---------------------------------------------------------------------------
+def normalize_sample(data: dict) -> tuple[str, str, str] | None:
+    """Convert supported raw OCR schemas to image/question/answer fields."""
+    if data.get("conv"):
+        turn = data["conv"][0]
+        image_path = data.get("img_path_sh") or data.get("img_path_cq")
+        question = turn.get("question", "")
+        answer = turn.get("answer", "")
+    else:
+        image_paths = data.get("image_path") or []
+        conversations = data.get("conversations") or []
+        image_path = image_paths[0] if image_paths else None
+        question = ""
+        answer = ""
+        for turn in conversations:
+            role = turn.get("from") or turn.get("role")
+            value = turn.get("value", turn.get("content", ""))
+            if isinstance(value, list):
+                value = " ".join(str(part.get("text", "")) for part in value if isinstance(part, dict))
+            if role in ("human", "user") and not question:
+                question = str(value).replace("<image>", "").strip()
+            elif role in ("gpt", "assistant") and not answer:
+                answer = str(value)
+
+    if not image_path or not question or not answer:
+        return None
+    return str(image_path), question, answer
+
+
+# ---------------------------------------------------------------------------
 # Token calculation
 # ---------------------------------------------------------------------------
 def calculate_tokens(image_path: str, question: str, answer: str, system_prompt: str, hunyuan_processor) -> int:
@@ -159,19 +190,10 @@ def count_tokens_for_file(
             try:
                 data = json.loads(line_str)
 
-                # Extract question/answer from conv
-                if not data.get("conv") or len(data["conv"]) == 0:
+                sample = normalize_sample(data)
+                if sample is None:
                     return None
-                conv = data["conv"][0]
-                question = conv.get("question", "")
-                answer = conv.get("answer", "")
-                if not question or not answer:
-                    return None
-
-                # Extract image path
-                img_path = data.get("img_path_sh") or data.get("img_path_cq")
-                if not img_path:
-                    return None
+                img_path, question, answer = sample
 
                 # Calculate tokens
                 num_tokens = calculate_tokens(img_path, question, answer, system_prompt, processor)

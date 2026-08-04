@@ -12,7 +12,26 @@ The pipeline: raw JSONL → tokenize + count → pack → training-ready JSONL.
 
 ## 1. Raw OCR JSONL Schema
 
-Each line in a raw JSONL file is one training sample:
+Each line in a raw JSONL file is one training sample. The packing script's `normalize_sample()`
+accepts two input formats, resolved in the following priority order.
+
+### Format A (preferred): `conv` + `img_path_sh` / `img_path_cq`
+
+```json
+{
+  "img_path_sh": "/absolute/path/to/image.png",
+  "conv": [
+    { "question": "Extract all body text from the document image as markdown...", "answer": "# Title\n\nBody text ..." }
+  ]
+}
+```
+
+| Field                       | Type         | Required | Notes                                                                      |
+| --------------------------- | ------------ | -------- | -------------------------------------------------------------------------- |
+| `img_path_sh`/`img_path_cq` | `str`        | ✅       | Absolute image path; `img_path_sh` is used if present, else `img_path_cq`. |
+| `conv`                      | `list[dict]` | ✅       | The 0-th turn's `question` / `answer` is used.                             |
+
+### Format B (fallback): `image_path` + `conversations`
 
 ```json
 {
@@ -20,19 +39,20 @@ Each line in a raw JSONL file is one training sample:
   "conversations": [
     {
       "from": "human",
-      "value": "<image>\n提取文档图片中正文的所有信息用markdown格式表示..."
+      "value": "<image>\nExtract all body text from the document image as markdown..."
     },
     { "from": "gpt", "value": "# Title\n\nBody text ..." }
   ]
 }
 ```
 
-**Fields:**
+| Field           | Type         | Required | Notes                                                                                |
+| --------------- | ------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `image_path`    | `list[str]`  | ✅       | List of absolute paths; the first image is used.                |
+| `conversations` | `list[dict]` | ✅       | Alternating `human`/`gpt` (or `user`/`assistant`) turns. The `<image>` placeholder in the `human` value is stripped and the remainder becomes the question. |
 
-| Field           | Type         | Required | Notes                                                                                                      |
-| --------------- | ------------ | -------- | ---------------------------------------------------------------------------------------------------------- |
-| `image_path`    | `list[str]`  | ✅       | Absolute paths. Usually 1 image; multi-image supported.                                                    |
-| `conversations` | `list[dict]` | ✅       | Alternating `human` / `gpt` turns. `<image>` placeholder in `human` value indicates image insertion point. |
+> Format B is only used when the sample has no `conv` field. Both formats are normalized to an
+> `image` / `question` / `answer` triple.
 
 ## 2. Packing Pipeline
 
@@ -76,31 +96,26 @@ PACK_OUTPUT=./data/parsing_packed_20480.jsonl \
 
 ### Output schema (packed JSONL)
 
-Each output line contains:
+Each output line is a JSON array. Each item is the sample consumed by the training dataset:
 
 ```json
-{
-    "packed_samples": [
-        {
-            "image_path": ["/abs/path/1.png"],
-            "conversations": [...]
-        },
-        {
-            "image_path": ["/abs/path/2.png"],
-            "conversations": [...]
-        },
-        ...
-    ],
-    "cu_seqlens": [0, 4123, 8567, ..., 20351],
-    "total_tokens": 20351
-}
+[
+    {
+        "image": "/abs/path/1.png",
+        "question": "Extract the text from the image",
+        "answer": "Recognized document text",
+        "num_tokens": 4123
+    },
+    {
+        "image": "/abs/path/2.png",
+        "question": "Extract the text from the image",
+        "answer": "Recognized document text",
+        "num_tokens": 4444
+    }
+]
 ```
 
-**Fields:**
-
-- `packed_samples`: original raw samples concatenated in this pack
-- `cu_seqlens`: cumulative token boundaries (for FlashAttention varlen)
-- `total_tokens`: sum ≤ `pack_length`
+The sum of `num_tokens` in one array is at most `pack_length`. `cu_seqlens` is recomputed by the training collator and is not stored in the JSONL.
 
 ### Performance tips
 
@@ -117,9 +132,9 @@ python -c "
 import json
 with open('./data/parsing_packed_20480.jsonl') as f:
     for i, line in enumerate(f):
-        r = json.loads(line)
-        print(f'pack {i}: {len(r[\"packed_samples\"])} samples, '
-              f'{r[\"total_tokens\"]} tokens')
+        pack = json.loads(line)
+        print(f'pack {i}: {len(pack)} samples, '
+              f'{sum(item.get(\"num_tokens\", 0) for item in pack)} tokens')
         if i >= 3: break
 "
 ```
