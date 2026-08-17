@@ -124,4 +124,4 @@ torchrun --nproc_per_node="${NPROC_PER_NODE}" \
          --master_port="${MASTER_PORT}" \
          --node_rank="${NODE_RANK}" \
          --nnodes="${NNODES}" \
-         ${entry_file} "${args}" 2>&1 | tee "${output_dir}/train_${NODE_RANK}.log"
+         ${entry_file} ${args} 2>&1 | tee "${output_dir}/train_${NODE_RANK}.log"
