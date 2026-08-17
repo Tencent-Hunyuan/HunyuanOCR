@@ -103,6 +103,7 @@ def count_tokens_for_file(
     threads_per_process: int,
     system_prompt: str,
     result_queue: Queue,
+    allow_empty_answer: bool = False,
 ):
     """
     Worker: load one JSONL file, compute num_tokens for each sample,
@@ -165,7 +166,12 @@ def count_tokens_for_file(
                 conv = data["conv"][0]
                 question = conv.get("question", "")
                 answer = conv.get("answer", "")
-                if not question or not answer:
+                if not question:
+                    return None
+                # An empty answer is a deliberate label for a blank page — the
+                # model must learn to emit nothing. Dropping it teaches the
+                # opposite, so it is only skipped when the caller asks.
+                if not answer and not allow_empty_answer:
                     return None
 
                 # Extract image path
@@ -284,6 +290,11 @@ def main():
         "--threads-per-process", type=int, default=8, help="Threads per process for image processing (default: 8)"
     )
     parser.add_argument("--system-prompt", type=str, default="", help="System prompt to use (default: empty)")
+    parser.add_argument(
+        "--allow-empty-answer",
+        action="store_true",
+        help="Keep samples whose answer is empty (blank-page labels). Off by default.",
+    )
     parser.add_argument("--seed", type=int, default=42, help="Random seed for shuffling (default: 42)")
 
     args = parser.parse_args()
@@ -345,6 +356,7 @@ def main():
                     args.threads_per_process,
                     args.system_prompt,
                     result_queue,
+                    args.allow_empty_answer,
                 ),
             )
             p.start()
