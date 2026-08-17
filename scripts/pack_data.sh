@@ -20,6 +20,12 @@ PACK_OUTPUT=${PACK_OUTPUT:-./data/parsing_packed_${PACK_LEN}.jsonl}
 NUM_PROCESSES=${NUM_PROCESSES:-32}
 THREADS_PER_PROCESS=${THREADS_PER_PROCESS:-8}
 LOG_FILE=${LOG_FILE:-pack_data.log}
+# Keep blank-page samples (empty answer). Set ALLOW_EMPTY=0 to drop them.
+ALLOW_EMPTY=${ALLOW_EMPTY:-1}
+EMPTY_FLAG=""
+[ "$ALLOW_EMPTY" = "1" ] && EMPTY_FLAG="--allow-empty-answer"
+# Run in the foreground when FOREGROUND=1 (easier to watch on one machine).
+FOREGROUND=${FOREGROUND:-0}
 
 # ────────────── Sanity check ──────────────
 if [ ! -f "$INPUT_LIST" ]; then
@@ -48,16 +54,21 @@ echo "  Log              : $LOG_FILE"
 echo "========================================"
 
 # ────────────── Run ──────────────
-nohup python tools/pipeline_count_and_pack.py \
-    --input-list "$INPUT_LIST" \
-    --model-path "$MODEL_PATH" \
-    --count-output-dir "$COUNT_OUTPUT_DIR" \
-    --pack-output "$PACK_OUTPUT" \
-    --num-processes "$NUM_PROCESSES" \
-    --threads-per-process "$THREADS_PER_PROCESS" \
-    --pack-length "$PACK_LEN" \
-    > "$LOG_FILE" 2>&1 &
+cmd=(python tools/pipeline_count_and_pack.py
+    --input-list "$INPUT_LIST"
+    --model-path "$MODEL_PATH"
+    --count-output-dir "$COUNT_OUTPUT_DIR"
+    --pack-output "$PACK_OUTPUT"
+    --num-processes "$NUM_PROCESSES"
+    --threads-per-process "$THREADS_PER_PROCESS"
+    --pack-length "$PACK_LEN")
+[ -n "$EMPTY_FLAG" ] && cmd+=("$EMPTY_FLAG")
 
-PID=$!
-echo "[started] pid=$PID  log=$LOG_FILE"
-echo "Monitor with:  tail -f $LOG_FILE"
+if [ "$FOREGROUND" = "1" ]; then
+    "${cmd[@]}" 2>&1 | tee "$LOG_FILE"
+else
+    nohup "${cmd[@]}" > "$LOG_FILE" 2>&1 &
+    PID=$!
+    echo "[started] pid=$PID  log=$LOG_FILE"
+    echo "Monitor with:  tail -f $LOG_FILE"
+fi
