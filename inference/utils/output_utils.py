@@ -92,26 +92,28 @@ def infer_stream(client, common_kwargs, repeat_min_repeats: int = 8) -> tuple[st
     next_check_at = 4000  # start checking after 4k chars
     check_step = 1000
     early_stopped = False
-    for event in stream:
-        if not event.choices:
-            continue
-        delta = event.choices[0].delta
-        piece = getattr(delta, "content", None)
-        if not piece:
-            continue
-        parts.append(piece)
-        acc_len += len(piece)
-        if acc_len >= next_check_at:
-            next_check_at = acc_len + check_step
-            tail = "".join(parts)[-8000:]
-            if has_tail_repetition(tail, min_repeats=repeat_min_repeats):
-                early_stopped = True
-                # Best-effort close; a broken stream at this point is fine.
-                try:
-                    stream.close()
-                except Exception:  # noqa: S110
-                    pass
-                break
+    try:
+        for event in stream:
+            if not event.choices:
+                continue
+            delta = event.choices[0].delta
+            piece = getattr(delta, "content", None)
+            if not piece:
+                continue
+            parts.append(piece)
+            acc_len += len(piece)
+            if acc_len >= next_check_at:
+                next_check_at = acc_len + check_step
+                tail = "".join(parts)[-8000:]
+                if has_tail_repetition(tail, min_repeats=repeat_min_repeats):
+                    early_stopped = True
+                    break
+    finally:
+        # Best-effort cleanup on completion, early-stop, errors, and interruption.
+        try:
+            stream.close()
+        except Exception:  # noqa: S110
+            pass
     return "".join(parts), early_stopped
 
 
