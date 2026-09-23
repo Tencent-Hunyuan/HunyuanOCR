@@ -71,11 +71,7 @@ Building upon the validated lightweight architecture of HunyuanOCR-1.0, HunyuanO
   structured outputs while **preserving the output distribution** of the target model.
 
 - 💻 **PC-side deployment via llama.cpp.**
-  Beyond server-grade vLLM, HunyuanOCR-1.5 also supports **CPU / consumer-GPU / laptop** deployment
-  through [`llama.cpp`](https://github.com/ggml-org/llama.cpp) with a GGUF-converted checkpoint and
-  an OpenAI-compatible `llama-server`. A DFlash-adapted `llama.cpp` fork is provided as well, so the
-  same speculative-decoding acceleration is available on PC. See
-  [`docs/llama_cpp.md`](docs/llama_cpp.md).
+  Beyond server-grade vLLM, HunyuanOCR-1.5 also supports **CPU / consumer-GPU / laptop** deployment through [`llama.cpp`](https://github.com/ggml-org/llama.cpp) with a GGUF-converted checkpoint and an OpenAI-compatible `llama-server`. See [`docs/llama_cpp.md`](docs/llama_cpp.md).
 
 - 🧠 **Better — Agentic Data Flow + upgraded training recipe.**
   On the data side, we propose **Agentic Data Flow**, an agent-driven data-construction system that
@@ -286,11 +282,11 @@ and multi-GPU instructions.
 
 For **CPU / consumer-GPU / laptop** environments, HunyuanOCR-1.5 can also be deployed through
 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) after converting the checkpoint to GGUF.
-Both the community `llama.cpp` (HunyuanOCR base only) and a DFlash-adapted fork
-([`wendadawen/llama.cpp @ dflash-adapt-hunyuanocr-hunyuanstyle`](https://github.com/wendadawen/llama.cpp/tree/dflash-adapt-hunyuanocr-hunyuanstyle))
-are supported.
+HunyuanOCR DFlash speculative decoding is now **merged upstream**
+([PR #28890](https://github.com/ggml-org/llama.cpp/pull/28890), build
+[`b11103`](https://github.com/ggml-org/llama.cpp/releases/tag/b11103) and later), so no fork is needed: upstream `master` serves both the base model and DFlash.
 
-Minimal build & serve (community, no DFlash):
+Minimal build & serve (base model only):
 
 ```bash
 # 1. Build
@@ -308,13 +304,24 @@ build/bin/llama-server \
     --model  ./HunyuanOCR/hyocr-f16.gguf \
     --mmproj ./HunyuanOCR/mmproj-hyocr-f16.gguf \
     --host 0.0.0.0 --port 8080 --alias HYVL \
-    --ctx-size 10240 --n-predict 4096
+    --ctx-size 10240 --n-predict 4096 \
+    -fa on --jinja
 ```
 
-DFlash-adapted variant, weight conversion for the draft, and a smoke-test client
+To enable DFlash, convert the draft that ships under `./HunyuanOCR/dflash` and add three flags:
+
+```bash
+python3 convert_hf_to_gguf.py --outfile ./HunyuanOCR/hyocr-dflash-bf16.gguf --outtype bf16 \
+    --target-model-dir ./HunyuanOCR ./HunyuanOCR/dflash
+
+# ... same llama-server command, plus:
+#     --spec-draft-model ./HunyuanOCR/hyocr-dflash-bf16.gguf \
+#     --spec-type draft-dflash --spec-draft-n-max 15 --parallel 1
+```
+
+Draft conversion, DFlash tuning, measured speedup, and a smoke-test client
 ([`llama_cpp/chat.py`](llama_cpp/chat.py) with 26 sample OCR images under
 [`llama_cpp/test_assets/`](llama_cpp/test_assets)):
-
 see [`docs/llama_cpp.md`](docs/llama_cpp.md) for the complete guide.
 
 ---
@@ -324,7 +331,7 @@ see [`docs/llama_cpp.md`](docs/llama_cpp.md) for the complete guide.
 - [`docs/training.md`](docs/training.md) — training modes, hyperparameters, distributed setup
 - [`docs/data_format.md`](docs/data_format.md) — raw OCR JSONL schema and packing pipeline
 - [`docs/inference/inference.md`](docs/inference/inference.md) — unified inference environment (vLLM AR / DFlash / transformers) + deployment tuning
-- [`docs/llama_cpp.md`](docs/llama_cpp.md) — PC-side deployment with llama.cpp (community & DFlash-adapted fork)
+- [`docs/llama_cpp.md`](docs/llama_cpp.md) — PC-side deployment with llama.cpp (base model & upstream DFlash)
 - [`docs/benchmark.md`](docs/benchmark.md) — end-to-end speed benchmark
 
 ---

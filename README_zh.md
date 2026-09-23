@@ -66,7 +66,7 @@
   端到端 OCR 通常伴随较长的自回归解码，这在稠密文档、表格、公式等长结构化输出场景中会成为主要瓶颈。HunyuanOCR-1.5 适配了基于 **DFlash** 的投机解码（speculative decoding）框架：一个轻量的块扩散（block-diffusion）草稿模型并行起草多个候选 token，再由目标模型一次性验证。这显著降低了长结构化输出的解码延迟，同时**保持目标模型的输出分布不变**。
 
 - 💻 **PC 端部署（llama.cpp）。**
-  除了服务器级的 vLLM，HunyuanOCR-1.5 还支持通过 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) 在 **CPU / 消费级 GPU / 笔记本** 上部署：使用转换后的 GGUF 权重和 OpenAI 兼容的 `llama-server`。同时我们还提供了一个适配 DFlash 的 `llama.cpp` 分支，因此同样的投机解码加速在 PC 端也可用。详见 [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)。
+  除了服务器级的 vLLM，HunyuanOCR-1.5 还支持通过 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) 在 **CPU / 消费级 GPU / 笔记本** 上部署：使用转换后的 GGUF 权重和 OpenAI 兼容的 `llama-server`。详见 [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)。
 
 - 🧠 **更强：Agentic Data Flow + 升级的训练配方。**
   在数据侧，我们提出 **Agentic Data Flow**，一套由智能体驱动的数据构造系统，能把模型的短板转化为可执行的数据需求。智能体深度参与素材检索、基于工具的校验、样本清洗与数据流水线开发，并与算法工程师形成闭环迭代。在 HunyuanOCR-1.5 中，该系统被用于**低资源 OCR、古文字 OCR、多图文字类 QA** 等长尾能力的定向补强。
@@ -245,9 +245,9 @@ python inference/vLLM/batch_infer.py \
 
 ### PC 端部署（llama.cpp）
 
-对于 **CPU / 消费级 GPU / 笔记本** 环境，HunyuanOCR-1.5 在将权重转换为 GGUF 后，也可以通过 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) 部署。社区版 `llama.cpp`（仅支持 HunyuanOCR 基座）和一个适配 DFlash 的分支（[`wendadawen/llama.cpp @ dflash-adapt-hunyuanocr-hunyuanstyle`](https://github.com/wendadawen/llama.cpp/tree/dflash-adapt-hunyuanocr-hunyuanstyle)）都受支持。
+对于 **CPU / 消费级 GPU / 笔记本** 环境，HunyuanOCR-1.5 在将权重转换为 GGUF 后，也可以通过 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) 部署。HunyuanOCR 的 DFlash 投机解码**已合并进上游**（[PR #28890](https://github.com/ggml-org/llama.cpp/pull/28890)，构建 [`b11103`](https://github.com/ggml-org/llama.cpp/releases/tag/b11103) 及之后），因此不再需要 fork：上游 `master` 同时支持基座模型与 DFlash。
 
-最小化的构建与启动（社区版，不含 DFlash）：
+最小化的构建与启动（仅基座模型）：
 
 ```bash
 # 1. 构建
@@ -265,12 +265,22 @@ build/bin/llama-server \
     --model  ./HunyuanOCR/hyocr-f16.gguf \
     --mmproj ./HunyuanOCR/mmproj-hyocr-f16.gguf \
     --host 0.0.0.0 --port 8080 --alias HYVL \
-    --ctx-size 10240 --n-predict 4096
+    --ctx-size 10240 --n-predict 4096 \
+    -fa on --jinja
 ```
 
-适配 DFlash 的变体、草稿模型的权重转换，以及一个测试客户端（[`llama_cpp/chat.py`](llama_cpp/chat.py)，附带 [`llama_cpp/test_assets/`](llama_cpp/test_assets)下的 26 张示例 OCR 图片）：
+启用 DFlash 只需转换随权重发布的 `./HunyuanOCR/dflash` 草稿，并追加三个参数：
 
-完整指南参见 [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)。
+```bash
+python3 convert_hf_to_gguf.py --outfile ./HunyuanOCR/hyocr-dflash-bf16.gguf --outtype bf16 \
+    --target-model-dir ./HunyuanOCR ./HunyuanOCR/dflash
+
+# ... llama-server 命令不变，另加：
+#     --spec-draft-model ./HunyuanOCR/hyocr-dflash-bf16.gguf \
+#     --spec-type draft-dflash --spec-draft-n-max 15 --parallel 1
+```
+
+草稿权重转换、DFlash 调参、实测加速，以及一个测试客户端（[`llama_cpp/chat.py`](llama_cpp/chat.py)，附带 [`llama_cpp/test_assets/`](llama_cpp/test_assets) 下的 26 张示例 OCR 图片）：完整指南参见 [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)。
 
 ---
 
@@ -279,7 +289,7 @@ build/bin/llama-server \
 - [`docs/training_zh.md`](docs/training_zh.md)：训练模式、超参数、分布式配置
 - [`docs/data_format_zh.md`](docs/data_format_zh.md)：原始 OCR JSONL 格式与打包流水线
 - [`docs/inference/inference_zh.md`](docs/inference/inference_zh.md)：统一推理环境（vLLM AR / DFlash / transformers）与部署调优
-- [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)：使用 llama.cpp 的 PC 端部署（社区版 & DFlash 适配分支）
+- [`docs/llama_cpp_zh.md`](docs/llama_cpp_zh.md)：使用 llama.cpp 的 PC 端部署（基座模型 & 上游 DFlash）
 - [`docs/benchmark_zh.md`](docs/benchmark_zh.md)：端到端速度基准测试
 
 ---

@@ -4,20 +4,13 @@
 
 HunyuanOCR-1.5 可通过 [`llama.cpp`](https://github.com/ggml-org/llama.cpp) 在 **CPU / 消费级 GPU / 笔记本** 上部署：把基座模型（可选还有 DFlash 草稿）转换为 GGUF 格式，然后用 OpenAI 兼容的 `llama-server` 提供服务。
 
-支持两个版本：
+> ✅ **DFlash 已并入上游。** HunyuanOCR 的 DFlash 投机解码已经通过 [PR #28890](https://github.com/ggml-org/llama.cpp/pull/28890) 合并进 `ggml-org/llama.cpp`（提交 [`828fdf2`](https://github.com/ggml-org/llama.cpp/commit/828fdf282e195300c2965bd9511807e24ed53bdb)，首个包含它的构建为 [`b11103`](https://github.com/ggml-org/llama.cpp/releases/tag/b11103)）。此前的 DFlash fork 不再需要，基座模型与 DFlash 都直接用上游 `master`（或任意 `>= b11103` 的构建）即可。
 
-| 版本                    | 仓库                                                                                                                                                     | 使用场景                                     |
-| :---------------------- | :------------------------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------- |
-| **社区版（无 DFlash）** | 上游 `ggml-org/llama.cpp`（main 分支）                                                                                                                   | 只需要 HunyuanOCR 基座，最简单最稳定。       |
-| **DFlash 适配版**       | fork：[`wendadawen/llama.cpp @ dflash-adapt-hunyuanocr-hunyuanstyle`](https://github.com/wendadawen/llama.cpp/tree/dflash-adapt-hunyuanocr-hunyuanstyle) | 需要在 PC 上用 DFlash 投机解码做端到端加速。 |
-
-> ⚠️ 上游 `llama.cpp` 对投机解码的支持有限，DFlash **尚未**合并进去，且仍有已知 bug。上面这个 fork 是我们针对 HunyuanOCR 的 DFlash 移植，**不是**社区版。
+如果你之前按旧版文档操作过，参数改名对照见 [§5 从旧 fork 迁移](#5-从旧-fork-迁移)。
 
 ---
 
-## 1. 社区版（HunyuanOCR 基座，不含 DFlash）
-
-### 1.1 克隆并编译 llama.cpp
+## 1. 克隆并编译 llama.cpp
 
 ```bash
 git clone https://github.com/ggml-org/llama.cpp.git
@@ -28,7 +21,14 @@ cmake -B build -DLLAMA_BUILD_EXAMPLES=ON
 cmake --build ./build --config Release -j
 ```
 
-### 1.2 为权重转换准备 Python 环境
+确认当前代码版本已经包含 DFlash：
+
+```bash
+build/bin/llama-server --help | grep -A2 -- --spec-type
+# 列出的类型里必须有 draft-dflash
+```
+
+## 2. 为权重转换准备 Python 环境
 
 ```bash
 uv venv --python 3.12 venv-llamacpp
@@ -36,11 +36,15 @@ source venv-llamacpp/bin/activate
 uv pip install huggingface_hub transformers torch openai
 ```
 
-### 1.3 下载 HunyuanOCR 权重并转换为 GGUF
+## 3. 下载 HunyuanOCR 权重并转换为 GGUF
 
 ```bash
 hf download tencent/HunyuanOCR --local-dir ./HunyuanOCR --exclude "v1.0/*"
+```
 
+HF 模型仓库把 DFlash 草稿放在 `dflash/` 子目录里，所以上面这一条命令会把基座和草稿一起拉下来。
+
+```bash
 # 语言 / 解码器权重 → hyocr-f16.gguf
 python3 convert_hf_to_gguf.py \
     --outfile ./HunyuanOCR/hyocr-f16.gguf \
@@ -55,85 +59,101 @@ python3 convert_hf_to_gguf.py \
     ./HunyuanOCR
 ```
 
-### 1.4 启动 OpenAI 兼容服务
+### 3.1 转换 DFlash 草稿权重（可选）
+
+只用基座模型可以跳过这一步。`--target-model-dir` 指向 HunyuanOCR 基座的 HF 检查点（用于 tokenizer / hidden size / 层数），位置参数指向 DFlash 检查点目录。
+
+```bash
+python3 convert_hf_to_gguf.py \
+    --outfile ./HunyuanOCR/hyocr-dflash-bf16.gguf \
+    --outtype bf16 \
+    --target-model-dir ./HunyuanOCR \
+    ./HunyuanOCR/dflash
+```
+
+---
+
+## 4. 启动 OpenAI 兼容服务
+
+### 4.1 仅基座模型
 
 ```bash
 build/bin/llama-server \
     --model  "./HunyuanOCR/hyocr-f16.gguf" \
     --mmproj "./HunyuanOCR/mmproj-hyocr-f16.gguf" \
     --host 0.0.0.0 --port 8080 --alias HYVL \
-    --ctx-size 10240 --n-predict 4096
+    --ctx-size 10240 --n-predict 4096 \
+    -fa on --jinja
 ```
 
 服务端点为 `http://<host>:8080/v1/chat/completions`，别名 `HYVL`。
 
----
-
-## 2. DFlash 适配版（HunyuanOCR + DFlash 投机解码）
-
-### 2.1 克隆并编译 DFlash 分支
-
-```bash
-git clone -b dflash-adapt-hunyuanocr-hunyuanstyle \
-    https://github.com/wendadawen/llama.cpp.git
-cd llama.cpp
-
-cmake -B build -DLLAMA_BUILD_EXAMPLES=ON
-cmake --build ./build --config Release -j
-```
-
-权重下载与基座 / mmproj 的 GGUF 转换与社区版一致，参见 1.2 和 1.3 节。
-
-### 2.2 把 DFlash 草稿权重转换为 GGUF
-
-`--target-model-dir` 指向 HunyuanOCR 基座的 HF 检查点（用于 tokenizer / config），位置参数指向 DFlash 检查点目录。
-
-```bash
-python3 convert_hf_to_gguf.py \
-    --outfile ./HunyuanOCR-Dflash/hyocr-dflash-bf16.gguf \
-    --outtype bf16 \
-    --target-model-dir ./HunyuanOCR \
-    ./HunyuanOCR-Dflash
-```
-
-### 2.3 启动带 DFlash 的 OpenAI 兼容服务
+### 4.2 启用 DFlash 投机解码
 
 ```bash
 build/bin/llama-server \
     --model       "./HunyuanOCR/hyocr-f16.gguf" \
     --mmproj      "./HunyuanOCR/mmproj-hyocr-f16.gguf" \
-    --model-draft "./HunyuanOCR-Dflash/hyocr-dflash-bf16.gguf" \
-    --dflash --draft-max 16 \
+    --spec-draft-model "./HunyuanOCR/hyocr-dflash-bf16.gguf" \
+    --spec-type draft-dflash --spec-draft-n-max 15 \
     --host 0.0.0.0 --port 8080 --alias HYVL \
     --ctx-size 10240 --n-predict 4096 \
     --parallel 1 \
-    --ubatch-size 8192 \
-    --batch-size  8192
+    -fa on --jinja
 ```
 
 DFlash 相关关键参数：
 
-| 参数                                | 含义                                     |
-| :---------------------------------- | :--------------------------------------- |
-| `--model-draft <path>`              | DFlash 草稿模型的 GGUF 路径              |
-| `--dflash`                          | 启用 DFlash 风格的投机解码               |
-| `--draft-max 16`                    | 每个投机步的草稿 token 数（K）           |
-| `--parallel 1`                      | 单串行 slot（在 PC 上跑 DFlash 时推荐）  |
-| `--ubatch-size / --batch-size 8192` | 大 batch，让目标模型在验证阶段有充足吞吐 |
+| 参数                                 | 含义                                                                                                                       |
+| :----------------------------------- | :------------------------------------------------------------------------------------------------------------------------- |
+| `--spec-draft-model <path>`（`-md`） | DFlash 草稿模型的 GGUF 路径                                                                                                |
+| `--spec-type draft-dflash`           | 选择 DFlash 投机解码。该类型可以从草稿 GGUF 的元数据里自动识别，显式指定只是为了不产生歧义。                               |
+| `--spec-draft-n-max 15`              | 每个投机步的草稿 token 数。发布的草稿模型 `block_size = 16`，因此上限是 15，超过会被自动截断；默认值只有 3，需要显式设置。 |
+| `--parallel 1`                       | 单串行 slot（在 PC 上跑 DFlash 时推荐）                                                                                    |
+| `-fa on`                             | 目标模型与草稿模型都启用 flash attention                                                                                   |
+| `--jinja`                            | 使用随权重发布的 chat template                                                                                             |
+
+对分辨率特别高的输入，可以额外调大 `--batch-size / --ubatch-size`（我们自己的机器上用的是 `8192`），让整块图像在一个 batch 里完成 prefill。
+
+### 4.3 实测 DFlash 加速
+
+上游 PR 给出的数据：Apple M5 Pro（6 性能核 + 12 能效核，48 GB 统一内存）、macOS 26.4.1、Metal 后端、Release 构建，跑本仓库自带的 26 张文档图 OCR 请求：
+
+| 指标         | 数值                      |
+| :----------- | :------------------------ |
+| 草稿接受率   | 约 0.5                    |
+| 平均接受长度 | 8.6                       |
+| 输出         | 与非投机解码逐字节一致    |
+| decode       | 84.6 → 167.1 t/s（约 2×） |
+| prefill      | 232 → 192 t/s（慢约 17%） |
+
+prefill 变慢是因为草稿模型同样要编码整个 prompt，所以短输出场景端到端基本持平，长结构化输出（稠密文档、表格、公式）加速明显。
 
 ---
 
-## 3. 快速验证
+## 5. 从旧 fork 迁移
+
+| 旧（fork）             | 新（上游）                                                   |
+| :--------------------- | :----------------------------------------------------------- |
+| `--model-draft <path>` | `--spec-draft-model <path>`（`-md`，`--model-draft` 仍可用） |
+| `--dflash`             | `--spec-type draft-dflash`                                   |
+| `--draft-max 16`       | `--spec-draft-n-max 15`                                      |
+
+草稿权重的 GGUF 转换命令没有变化。另外，旧文档里的 `--draft-max 16` 超过了训练时的 block size，实际上一直被截断为 15。
+
+---
+
+## 6. 快速验证
 
 我们在 [`llama_cpp/`](../llama_cpp) 下附带一个最小的 OpenAI 兼容客户端和 26 张 OCR 测试图片，用于端到端冒烟测试。
 
-### 3.1 安装客户端依赖
+### 6.1 安装客户端依赖
 
 ```bash
 pip install openai
 ```
 
-### 3.2 运行
+### 6.2 运行
 
 ```bash
 cd llama_cpp
@@ -151,7 +171,7 @@ MAX_REQUESTS = 10                # 总请求上限
 TYPE_LIMITS  = {"ocr": 1}        # 按类型限制；设为 None 关闭
 ```
 
-### 3.3 示例输出
+### 6.3 示例输出
 
 ```
 === [ocr] ocr/0.png ===
@@ -167,3 +187,5 @@ direct sum of (possibly infinitely many) simple $ (R/J) $-modules. ...
 ```
 
 看到响应被流式返回，末尾出现 `[total]` 行，说明 llama.cpp 部署（含 / 不含 DFlash）工作正常。
+
+启用 DFlash 时，server 日志还会输出草稿接受率，这是确认投机解码确实在生效的最快方式。
