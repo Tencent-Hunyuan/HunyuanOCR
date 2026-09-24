@@ -77,6 +77,10 @@ python inference/vLLM/batch_infer.py \
     --ports 8000 --task-type doc_parse --max-tokens 32768 --concurrency 16
 ```
 
+The batch client finishes all scheduled images and records per-image results in
+`results.jsonl`. It exits with status **1** if any image fails, or **0** when all
+scheduled images succeed (including empty or fully resumed batches).
+
 For **native transformers** (multi-GPU direct inference / alignment checks):
 
 ```bash

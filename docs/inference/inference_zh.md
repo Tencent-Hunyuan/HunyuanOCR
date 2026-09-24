@@ -68,6 +68,9 @@ python inference/vLLM/batch_infer.py \
     --ports 8000 --task-type doc_parse --max-tokens 32768 --concurrency 16
 ```
 
+批量客户端会完成所有已调度图片，并将逐图结果记录到 `results.jsonl`。
+只要有图片处理失败，退出码即为 **1**；全部成功时为 **0**（包括空目录或所有图片均已完成而跳过的情况）。
+
 **原生 transformers**（多卡直接推理 / 对齐校验）：
 
 ```bash

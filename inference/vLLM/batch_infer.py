@@ -157,7 +157,8 @@ def main():
         f"doc_pp_applied={st['pp']} in {(time.time() - st['t0']) / 60:.1f}min",
         flush=True,
     )
+    return 1 if st["err"] else 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
