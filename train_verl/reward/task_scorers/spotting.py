@@ -105,17 +105,29 @@ def _parse_format2(text: str) -> list[tuple]:
 
 
 def _parse_format3(text: str) -> list[tuple]:
-    """``text(x1,y1),(x2,y2)``."""
+    """``text(x1,y1),(x2,y2)`` items, concatenated back to back."""
     try:
-        items = re.split(r"(?<=\))\s*(?=[^\s\(\),])", text)
+        # Anchor on the coordinate tail ``(x1,y1),(x2,y2)`` itself instead of
+        # splitting on every ``)``. Recognised text legitimately contains
+        # parentheses ("ATLANTA (AP)", "金额(小写)"); a ``(?<=\))`` split treated
+        # those as item boundaries and dropped the leading half -- e.g.
+        # "ATLANTA (AP) Second(1,2),(3,4)" lost "ATLANTA (AP)". Each item's text
+        # is whatever precedes its coordinate pair, back to the end of the
+        # previous pair, so incidental parentheses can no longer break the split.
+        coord = re.compile(r"\((\d+),(\d+)\),\((\d+),(\d+)\)")
         results = []
-        for item in items:
-            match = re.match(r"([^\(]+)\((\d+),(\d+)\),\((\d+),(\d+)\)", item.strip())
-            if match:
-                content = match.group(1).strip()
-                x1, y1 = int(match.group(2)), int(match.group(3))
-                x2, y2 = int(match.group(4)), int(match.group(5))
-                results.append((content, x1, y1, x2, y2))
+        last = 0
+        for m in coord.finditer(text):
+            content = text[last:m.start()].strip()
+            last = m.end()
+            # A genuine item needs real text before its coordinates. A gap made
+            # only of coordinate punctuation -- the trailing ",(5,6),(7,8)" of
+            # "Hello(1,2),(3,4),(5,6),(7,8)" -- is not a new item; keep binding
+            # to the first pair, matching the previous parser's behaviour.
+            if not re.search(r"[^\s(),]", content):
+                continue
+            x1, y1, x2, y2 = (int(g) for g in m.groups())
+            results.append((content, x1, y1, x2, y2))
         return results
     except BaseException:
         return []
