@@ -587,6 +587,7 @@ def apply_pattern_T(text, stats):
 COORD_PAIR = re.compile(r"\(\d{1,4},\d{1,4}\),\(\d{1,4},\d{1,4}\)")
 # one-or-more trailing coord pairs (optionally separated by , / whitespace) at line end
 TRAILING_COORDS = re.compile(r"(?:[ \t,，]*\(\d{1,4},\d{1,4}\),\(\d{1,4},\d{1,4}\))+[ \t]*$")
+TABLE_TAG = re.compile(r"<(/?)table(?=[\s>]|$)", re.IGNORECASE)
 
 
 def _has_html_table_token(line):
@@ -605,9 +606,13 @@ def apply_pattern_U(text, stats):
     masked = re.sub(r"\$\$[\s\S]*?\$\$|\$[^\$\n]+\$|\\\[[\s\S]*?\\\]", _mask, text)
 
     out_lines = []
+    table_depth = 0
     for line in masked.split("\n"):
-        # Leave table-bearing lines untouched.
-        if _has_html_table_token(line):
+        # Preserve cell content even when table tags are on separate lines.
+        inside_table = table_depth > 0
+        for tag in TABLE_TAG.finditer(line):
+            table_depth = max(0, table_depth - 1) if tag.group(1) else table_depth + 1
+        if inside_table or table_depth or _has_html_table_token(line):
             out_lines.append(line)
             continue
         if not COORD_PAIR.search(line):
